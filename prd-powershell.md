@@ -322,7 +322,21 @@ here is a review-level claim, not a tested one.
   | atuin | 60 ms |
   | PSFzf | 143 ms |
 
-  🔴 **The init cache appears not to work at all.** `starship` costs 110 ms cached
+  **Fourth measurement, and the previous conclusion was wrong: 550 ms** `[RUN]`.
+  carapace 38 ms, zoxide 14 ms, atuin 45 ms, no `(regenerated cache: …)` lines. The
+  cache works. carapace's 960 ms was its **first, cold** run — building its own
+  internal state — not a per-start cost.
+
+  Net: 550 ms now with four more tools than the 847 ms baseline. Remaining costs are
+  PSFzf 147 ms and starship 100 ms, both module/script loads.
+
+  ⚠️ **Retraction of the paragraph below.** It was written from two timing numbers and
+  asserted a broken cache. Wrong, and the fourth over-inference of this kind in this
+  project — the pattern is reading a mechanism failure into data that only showed a
+  cost. The diagnostics added in response are worth keeping regardless; the diagnosis
+  was not.
+
+  ~~🔴 **The init cache appears not to work at all.**~~ `starship` costs 110 ms cached
   against 102 ms uncached, and `carapace` costs 960 ms — both consistent with the
   binary being run on every start. And it would have failed *silently*: if
   `New-Item`/`Set-Content` threw, the old code left `$fresh` false forever and simply
@@ -443,6 +457,7 @@ Windows-side re-quoting. That still needs a live `Ctrl+T`.
 | 🔴 | **WSL copy is still a `cp -r`**, not a clone. The drift problem is not yet solved, only made solvable |
 | 🔴 | **No PowerShell code has been run** |
 | ✅ | It loads and works. `Test-CliToolsSetup` reports `cli_tools: OK` — no shadowed names, all 17 tools resolvable. `z`, `ll`, `b`, `..` confirmed working by hand `[RUN]` |
-| 🔴 | **The real blocker is now documentation, not code.** His words: "остальные хз как использовать". `e`, `cs`, `path`, `tl`, `tp`, `rgh`, `ff`, `fdd`, `pg`, `Ctrl+R`, `Alt+C` and the scoop wrappers are all installed and all unused, because nothing tells him what they do. `cheatsheet.md` has no PowerShell content and `bootstrap/INSTALL.md` has no Windows section — M4 was deferred and that deferral is what is costing him now |
+| ✅ | `cheatsheet.md` now has a PowerShell block: what to press, every name that differs from Linux and why, a runnable example for each command he had not used, the diagnostic switches, and the escape hatches. Written with real invocations rather than an alias→command table, because the gap was "I don't know how to use these", not "I forgot the flag" |
+| 🔴 | `bootstrap/INSTALL.md` still has no Windows section |
 | ✅ | **`Ctrl+T` freeze: diagnosed and fixed, hypothesis confirmed by measurement.** In `$HOME`, `fd -tf -HI --exclude .git` took **3305 ms**; with `-I` dropped and `AppData`/`node_modules` excluded, **235 ms** — 14× `[RUN]`. `Alt+C` was unaffected because it lists directories only, of which there are orders of magnitude fewer. The Linux config's `-HI` is fine on Linux and wrong in a Windows home directory, where `AppData` lives |
 | 🔴 | The replace-and-backup path in `install.ps1` is still untested: `$PROFILE` did not exist, so it took the create branch |

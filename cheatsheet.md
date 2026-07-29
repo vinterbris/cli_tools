@@ -8,6 +8,8 @@ Dense reference. What to type, not why — the reasoning is in [modern-cli-tools
 
 Aliases below come from [`dotfiles/shell_common`](dotfiles/shell_common). Search this file from the shell with `cs <term>`.
 
+**On PowerShell, jump to [PowerShell — start here](#powershell--start-here).** The tools are the same; a dozen names are not, and that section is the whole difference.
+
 ---
 
 ## Aliases — listing & viewing
@@ -388,6 +390,129 @@ sudo !!       # rerun it with sudo
 command rm file   # same, more explicit
 unalias rm        # for the session
 ```
+
+---
+
+## PowerShell — start here
+
+Everything above is zsh/bash. On Windows the tools are the same, several **names are
+not**. This section is the whole difference; config is
+[`dotfiles/profile.ps1`](dotfiles/profile.ps1) and
+[`dotfiles/functions.ps1`](dotfiles/functions.ps1).
+
+Three rules explain every rename:
+
+1. **`Set-Alias` cannot carry arguments.** Anything with a flag is a function.
+2. **A built-in alias beats a function of the same name, silently.** `gc`, `gcm`, `gl`,
+   `gp`, `h`, `ls` are taken by cmdlets, so nothing here uses those names.
+3. **`ls` and `cat` stay native.** `ls | Where-Object Length -gt 1MB` keeps working
+   because `ls` still returns objects. eza is `e`.
+
+### PowerShell — what to press
+
+| Key | Does | From |
+|---|---|---|
+| `Ctrl-R` | search history — fuzzy, with cwd and exit code | atuin |
+| `Ctrl-T` | pick a file, insert its path into the line | PSFzf |
+| `Alt-C` | pick a directory and cd into it | PSFzf |
+| `Tab` | menu completion for 1000+ commands' flags | carapace |
+| `↑` / `↓` | history search by what you already typed | PSReadLine |
+| `→` | accept the greyed-out suggestion | PSReadLine |
+| `Ctrl-A` / `Ctrl-E` | start / end of line | PSReadLine |
+| `Ctrl-W` | delete word back | PSReadLine |
+| `Alt-.`| insert last argument of the previous command | PSReadLine |
+
+Inside fzf: `Tab` multi-select · `Ctrl-J/K` move · `Ctrl-/` toggle preview · `Esc` cancel.
+
+Try `Tab` after typing `rg --` — that is carapace, and it is the thing you had none of
+before.
+
+### PowerShell — names that differ from Linux
+
+| Linux | PowerShell | Why |
+|---|---|---|
+| `ls` → eza | **`e`** | `ls` stays `Get-ChildItem` so pipelines survive |
+| `df` → duf | **`duf`** | there is no `df` on Windows to replace |
+| `top` → btop | **`btm`** | btop has no Windows build; `bottom` does |
+| `grep` → ug | **`rg`**, or native `sls` | Windows has no `grep` to improve on |
+| `h` → tldr | **`tldr`** | `h` is `Get-History` |
+| `py` | **`py`** (built in) | Windows ships the Python launcher already |
+| `sudo` | **`sudo`** → gsudo | elevates in the same console |
+| `gs`, `gd`, `gl`, `gc`… | **none** | git runs from WSL. `g` is a plain passthrough: `g status -sb` |
+| `tp` → trash-put | **`tp`** → Recycle Bin | `rm`/`Remove-Item` deletes permanently and has no `-I` |
+
+Same names as Linux: `ll` `la` `lt` `ltt` `ltg` `lsize` `lnew` `b` `bp` `rgh` `rgf`
+`ff` `fdd` `fda` `dsz` `dus` `pg` `ptree` `pcpu` `pmem` `jqc` `jqr` `http` `fm` `lg`
+`path` `cs` `..` `...` `....` `z` `zi`.
+
+### PowerShell — the ones you have not used yet
+
+```powershell
+e                          # eza listing; ll long, la with hidden, lt tree
+b README.md                # read a file, highlighted. bp = plain, safe to copy
+cs fzf                     # search this cheatsheet by section, with preview
+cs -List                   # just the section titles
+path                       # PATH, one entry per line, instead of one long string
+
+ff config                  # find FILES matching "config"        (fd -tf)
+fdd node                   # find DIRECTORIES matching "node"     (fd -td)
+fda secret                 # include hidden and gitignored files  (fd -HI)
+rgh TODO                   # ripgrep everything: hidden, binary, ignored
+rgf                        # list every file rg would search
+
+fe                         # pick a file, open it in $EDITOR (micro)
+fif TODO                   # pick a MATCH inside files, open at that line
+fkill                      # pick a process, kill it
+pg chrome                  # process grep; pcpu / pmem sort by cpu / memory
+
+tp junk.txt notes.txt      # delete to the Recycle Bin — recoverable
+tl                         # list what is in the Recycle Bin
+tempty                     # empty it
+
+ouch decompress x.tar.gz   # any archive format, one command
+ouch compress src out.zip
+mdv README.md              # markdown rendered in the terminal (glow)
+hyperfine 'rg TODO' 'sls TODO'   # benchmark two commands against each other
+
+scoopse ripgrep            # search; scoopin install; scooprm uninstall
+scoopup                    # refresh manifests AND upgrade everything
+```
+
+`atuin` owns `Ctrl-R`. History is local only — nothing is uploaded and no account
+exists until you run `atuin login`.
+
+`esf` / `esr` (Everything, instant filename search over the whole disk) appear only if
+`es.exe` is on `PATH`. The Everything GUI does not include it — it is a separate
+download from voidtools.
+
+### PowerShell — when something looks wrong
+
+```powershell
+Test-CliToolsSetup         # name collisions + which tools are missing
+Test-CliToolsCache         # is the init cache actually being used
+Clear-CliToolsCache        # wipe it, then restart the shell
+
+$env:CLI_TOOLS_TIMING=1; pwsh -NoLogo -Command exit    # per-stage startup cost
+$env:CLI_TOOLS_SELFCHECK=1; pwsh -NoLogo               # run the self-check at start
+$env:CLI_TOOLS_NO_CACHE=1                              # bypass the init cache
+$env:CLI_TOOLS_ICONS=1                                 # Terminal-Icons back (costs 348 ms)
+```
+
+Machine-local settings go in `dotfiles/profile.local.ps1`, which is untracked and
+loaded last.
+
+### PowerShell — escaping the config
+
+```powershell
+Get-ChildItem              # the real cmdlet, whatever ls is doing
+Remove-Item -LiteralPath x # bypass tp entirely
+Get-Command e | Format-List # what does this name actually resolve to
+Get-Alias                  # everything currently aliased
+```
+
+`Get-Command <name>` is the answer to "why did that do something unexpected" — it
+reports whether the name is an Alias, Function, Cmdlet or Application, in that
+precedence order.
 
 ---
 
