@@ -216,7 +216,10 @@ if (Get-CliBin es) {
 # --- misc -------------------------------------------------------
 # `md` already exists as a PowerShell function (mkdir). Left alone.
 if (Get-CliBin yazi) { Set-Alias fm yazi -Force }
-if (Get-CliBin glow) { function mdv { glow -p @args } }   # markdown, paged
+# No -p: glow's pager is `less`, which does not exist on Windows, so -p fails
+# with "executable file not found in %PATH%". Rendering straight to stdout
+# lets the terminal's own scrollback do the paging.
+if (Get-CliBin glow) { function mdv { glow @args } }
 
 function path { $env:PATH -split ';' | Where-Object { $_ } }
 

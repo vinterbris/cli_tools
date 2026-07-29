@@ -209,3 +209,100 @@ chsh -s /bin/bash "$USER"              # if you want bash back
 ```
 
 Removing the symlinks alone is enough to disable everything — the installed tools are inert without the config.
+
+---
+
+# Windows / PowerShell 7
+
+Separate installer: [`install.ps1`](install.ps1). Same idea, different mechanics — no symlinks, no copies, and Scoop instead of apt.
+
+## Fast path
+
+```powershell
+git clone https://github.com/vinterbris/cli_tools.git $HOME\cli_tools
+& $HOME\cli_tools\bootstrap\install.ps1 -DryRun    # read this before the real run
+& $HOME\cli_tools\bootstrap\install.ps1
+```
+
+Then open a new `pwsh` and run `Test-CliToolsSetup`. It should say `cli_tools: OK`.
+
+## Prerequisites
+
+| Needs | Why | Check |
+|---|---|---|
+| PowerShell **7+** | 5.1 is out of scope: one profile, one version | `$PSVersionTable.PSVersion` |
+| **Scoop** | The package manager. Not installed automatically — bootstrapping a package manager by piping a remote script is a decision, not a side effect | `Get-Command scoop` |
+| A **Nerd Font** in the terminal | Only for `eza --icons`. The Pure prompt's `❯` needs nothing special | Terminal settings, not the shell |
+
+If Scoop is missing, `install.ps1` prints the two commands and stops.
+
+## What it does
+
+1. Adds the `main` and `extras` Scoop buckets.
+2. Installs the tool list. Success is judged by `Test-Path <scoop>\apps\<name>` **after** the attempt — a native command that fails sets `$LASTEXITCODE` rather than throwing, so a `try/catch` alone would report unearned successes.
+3. Installs the `PSFzf` module from the PowerShell Gallery.
+4. Writes `$PROFILE` as a one-line stub that dot-sources `dotfiles\profile.ps1`.
+
+Nothing is deleted. An existing `$PROFILE` is copied to `<profile>.bak-<timestamp>` first.
+
+## Options
+
+| Flag | Effect |
+|---|---|
+| `-DryRun` | Print every action, change nothing. Run this first |
+| `-SkipTools` | Only rewrite the `$PROFILE` stub — use this after moving the repo |
+| `-SkipProfile` | Only install packages |
+
+## Why there is no symlink
+
+`$PROFILE` holds one line pointing at the repo, so the file in the repo *is* the loaded config and there is no sync step. Two reasons it works out this way:
+
+- `New-Item -ItemType SymbolicLink` needs Developer Mode or an elevated shell on Windows.
+- zsh insists on `~/.zshrc` at a fixed path and so needs a link; PowerShell lets the stub point anywhere.
+
+Consequence: **moving the repo breaks the shell**, because the stub holds an absolute path. Re-run `install.ps1 -SkipTools` after any move.
+
+## Config policy
+
+The repo is the single source of truth. Tools are pointed at it with environment variables — `$STARSHIP_CONFIG` today, `$BAT_CONFIG_PATH` and friends as configs appear. Nothing is copied into a tool's conventional directory.
+
+Trade-off worth knowing: a tool launched from *outside* pwsh — from Explorer, or another shell — will not see those variables and falls back to its own default location.
+
+## Startup cost
+
+The generated init scripts for starship, zoxide, carapace and atuin are cached in `%LOCALAPPDATA%\cli_tools\cache` and dot-sourced, instead of running four binaries on every shell start. Staleness compares timestamps against the binary, so `scoop update` invalidates the cache by itself.
+
+```powershell
+$env:CLI_TOOLS_TIMING=1; pwsh -NoLogo -Command exit   # per-stage cost
+Test-CliToolsCache                                    # is the cache being used
+Clear-CliToolsCache                                   # wipe it
+```
+
+Measured on the reference machine: 181 ms for a bare `pwsh -NoProfile`, ~550 ms inside the profile. The largest remaining items are the `PSFzf` and `PSReadLine` module loads.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Ctrl-T` hangs for seconds in `$HOME` | `fd` is walking `AppData` | Already fixed — `-I` dropped and `AppData`/`node_modules` excluded. Check `$env:FZF_CTRL_T_COMMAND` |
+| A shortcut of yours "does nothing and gives no error" | A built-in cmdlet alias beats a function of the same name, silently | `Test-CliToolsSetup`, and `Get-Command <name>` to see what it resolved to |
+| `Ctrl-R` opens the wrong picker | atuin owns `Ctrl-R` when installed, PSFzf when not | `Get-PSReadLineKeyHandler -Bound` |
+| Preview pane in `Ctrl-T` shows a cmd error | The dual file/directory preview is quoting-sensitive | `dotfiles\profile.ps1` has a one-line file-only fallback in a comment |
+| `Tab` prints raw escape codes | carapace needs `MenuComplete`, and `-EditMode` resets key bindings | Order matters — `EditMode` first, then the Tab handler |
+| `glow -p` → `"less" not found` | glow's pager is `less`, which Windows lacks | `mdv` already drops `-p`. Don't add it back |
+| `scoop install X` reported `failed` | Wrong package name or wrong bucket | `scoop search X`. Note `carapace` is `carapace-bin` in `extras` |
+| Icons are boxes | Terminal font is not a Nerd Font | Terminal settings |
+| Prompt is plain | starship missing, or a stale cache | `Get-Command starship`, then `Clear-CliToolsCache` |
+
+## Rollback
+
+```powershell
+Get-ChildItem "$PROFILE.bak-*"        # backups, timestamped
+Copy-Item "$PROFILE.bak-<ts>" $PROFILE -Force
+Remove-Item $PROFILE                  # or just delete it — pwsh starts bare
+Clear-CliToolsCache
+scoop uninstall <name>                # per tool
+Uninstall-Module PSFzf
+```
+
+Deleting the one-line `$PROFILE` stub disables everything at once. The installed tools are inert without the config.
