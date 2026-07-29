@@ -6,13 +6,21 @@ tags: [cli, index]
 
 Modern command-line environment: tool selection, runnable config, and the material to actually learn it.
 
-Targets Debian-family Linux — Ubuntu 24.04 (WSL), Pop!\_OS 22.04, Debian 12.
+One prompt, one tool set, one cheatsheet across three shells: **zsh**, **bash**, and **PowerShell 7**.
+
+| Platform | Status | Shell | Prompt |
+|---|---|---|---|
+| Ubuntu 24.04 (WSL2) | deployed | zsh | starship, Pure preset |
+| Windows 11 | config written, untested | PowerShell 7 | the same `starship.toml` |
+| Pop!\_OS 22.04 (laptop) | planned | zsh | — |
+| Debian 12 (server) | planned | bash | — |
 
 ## Start here
 
 | If you want to | Read |
 |---|---|
-| Set up a new machine | [bootstrap/INSTALL.md](bootstrap/INSTALL.md) |
+| Set up a new Linux machine | [bootstrap/INSTALL.md](bootstrap/INSTALL.md) |
+| Set up Windows / PowerShell | [prd-powershell.md](prd-powershell.md), then `bootstrap/install.ps1 -DryRun` |
 | Look up a command or flag | [cheatsheet.md](cheatsheet.md) — or type `cs <term>` |
 | Solve a specific task | [usecases.md](usecases.md) |
 | Learn this systematically | [learning-plan.md](learning-plan.md) |
@@ -28,14 +36,18 @@ cli_tools/
 ├── cheatsheet.md          what to type — dense, print-oriented
 ├── usecases.md            how to solve a task — ordered by frequency
 ├── learning-plan.md       how to absorb it — phases, not weeks
-├── dotfiles/              runnable config, symlinked into $HOME
+├── prd-powershell.md      the PowerShell port: audit, decisions, open items
+├── dotfiles/              runnable config
 │   ├── shell_common       aliases, exports, functions (bash + zsh)
 │   ├── zshrc              zsh init
 │   ├── bashrc             bash init
-│   ├── starship.toml      prompt (Pure emulation)
+│   ├── profile.ps1        PowerShell 7 init
+│   ├── functions.ps1      the alias/function layer, ported to PowerShell
+│   ├── starship.toml      prompt (Pure emulation) — shared by all three shells
 │   └── README.md          install, load order, design rules
 ├── bootstrap/
-│   ├── install.sh         idempotent installer, --dry-run
+│   ├── install.sh         idempotent Linux installer, --dry-run
+│   ├── install.ps1        idempotent Windows installer, -DryRun
 │   └── INSTALL.md         manual sequence, per-machine notes, troubleshooting
 └── archive/               superseded PDF/HTML/PNG renders
 ```
@@ -44,18 +56,28 @@ Each document answers one question and links to the others rather than repeating
 
 ## Quick install
 
+Linux:
+
 ```bash
-git clone <repo> ~/cli_tools
+git clone https://github.com/vinterbris/cli_tools.git ~/cli_tools
 ~/cli_tools/bootstrap/install.sh --dry-run
 ~/cli_tools/bootstrap/install.sh --install-managers
 exec zsh
+```
+
+Windows (PowerShell 7 + Scoop):
+
+```powershell
+git clone https://github.com/vinterbris/cli_tools.git $HOME\cli_tools
+& $HOME\cli_tools\bootstrap\install.ps1 -DryRun
+& $HOME\cli_tools\bootstrap\install.ps1
 ```
 
 ## Design rules
 
 Applied throughout, and the reason the config looks the way it does:
 
-- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed` do what a pasted script or `man` example expects. New tools get new names. Three sanctioned exceptions: `rm -I`, `df`→`duf`, `grep`→`ug`.
+- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed` do what a pasted script or `man` example expects. New tools get new names. Three sanctioned exceptions on Linux: `rm -I`, `df`→`duf`, `grep`→`ug`. **Zero on Windows** — see [dotfiles/README.md](dotfiles/README.md#powershell-specific) for why each one loses its justification there.
 - **No framework.** oh-my-zsh replaced by two `source` lines. Nothing is loaded that you cannot point at.
 - **Guarded everywhere.** Every tool reference is wrapped in `command -v`, so the config works on a bare machine and lights up as you install.
 - **Machine-local settings never touch tracked files** — `~/.zshrc.local` and `~/.bashrc.local` are sourced at the end.

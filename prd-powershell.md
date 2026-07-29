@@ -4,8 +4,9 @@ tags: [prd, powershell, windows]
 
 # PRD — PowerShell 7 port
 
-Planning document, awaiting sign-off. Not yet implemented. Delete or fold into
-[README.md](README.md) + [HANDOFF.md](HANDOFF.md) once the work lands.
+Signed off 2026-07-30. Code written, **never executed** — see §8 and §9.
+Delete or fold into [README.md](README.md) + [HANDOFF.md](HANDOFF.md) once it has
+actually run on the machine.
 
 Provenance tags: `[WEB]` searched · `[REPO]` read in this repo · `[RUN]` executed ·
 `[INF]` derived · `[MEM]` recalled, unverified · `[?]` unrecorded.
@@ -45,6 +46,37 @@ Binary, checkable on the machine:
 | Package manager | Scoop (no admin, current versions, `scoop update *`) |
 | Terminal | Windows Terminal — assumed present |
 | Scope | 3 core tools **+** ported alias/function layer **+** git repo & README |
+| **Git aliases** | **None on Windows.** git is driven from WSL, where `shell_common` already has them. `g`→`git` passthrough only. Q1 below is therefore closed without renaming anything |
+| **`rm`** | Untouched. Recoverable deletion is `tp` → Recycle Bin. Option (a) |
+| **Drop list** | `grep`→`ug`, `df`→`duf`, `top`→`btop`, `py`, `MANPAGER`, `h`→`tldr` all dropped. `bottom` (`btm`) installed instead of btop |
+| **Remote** | `https://github.com/vinterbris/cli_tools.git` — new repo. The old `vinterbris/dotfiles` is left as-is |
+
+### Phase 0 results — measured on the machine, 2026-07-30 `[RUN]`
+
+| Check | Result | Consequence |
+|---|---|---|
+| `$PSVersionTable.PSVersion` | **7.6.4** | PSReadLine ≥ 2.3, all prediction options available |
+| `$PROFILE` | `C:\Users\Vinterbris\Documents\PowerShell\Microsoft.PowerShell_profile.ps1` | **Not** OneDrive-redirected. The `$PROFILE` trap did not fire |
+| `Get-Alias gc,gcm,gl,gp,h,ls` | all six exist | Collision prediction confirmed exactly |
+| `Get-Alias gs,gd,ga,gco,gcb,tp` | none exist | Those names are free |
+| `scoop search` | fzf **0.74.1**, zoxide **0.10.0**, starship **1.26.0**, all in `main` | fzf ≫ 0.48 — the Pop!\_OS fallback path has no Windows counterpart to maintain |
+| `winget` | absent | Scoop only. atuin would come from Scoop, not winget |
+
+### Resolved from the PSFzf README `[WEB]`
+
+- `Set-PsFzfOption -PSReadlineChordProvider 'Ctrl+t' -PSReadlineChordReverseHistory 'Ctrl+r'` — exact form. `Ctrl+R` is **not** taken by default.
+- `Alt+C` **is** bound by default; there is no chord parameter for it, only `-AltCCommand` to change what it runs. An earlier guess at `-PSReadlineChordSetLocation` was wrong.
+- PSFzf **does** honour `FZF_DEFAULT_COMMAND`, `FZF_CTRL_T_COMMAND`, `FZF_ALT_C_COMMAND` — closes the `[?]` in §5.2. It does **not** honour `FZF_CTRL_T_OPTS`/`FZF_ALT_C_OPTS`; `_PSFZF_FZF_DEFAULT_OPTS` is the replacement mechanism.
+- PSFzf already ships `Invoke-FuzzyEdit`, `Invoke-FuzzyKillProcess` and `Invoke-PsFzfRipgrep`, so `fe`, `fkill` and `fif` are aliases rather than rewrites. Three of the five Linux functions did not need porting at all.
+- Its optional aliases include `fd` (→`Invoke-FuzzySetLocation`), which would shadow the `fd` binary. `-EnableAlias*` must stay off.
+
+### From the old `vinterbris/dotfiles` profile `[REPO]`
+
+- Active prompt was **oh-my-posh** (`takuya` theme); the starship lines were commented out. starship replaces it; `install.ps1` backs up the old profile and warns. oh-my-posh stays installed, just uninitialised.
+- A takuya-theme prompt implies a Nerd Font is already configured in Windows Terminal — so `eza --icons` should render.
+- `starship_pure.toml` in that repo is the stock Pure preset but uses the **deprecated** `vicmd_symbol` key; `dotfiles/starship.toml` has the current `vimcmd_symbol`. Nothing to salvage.
+- Worth keeping from it: `g`→`git`, `gsudo`→`sudo`, `vim`→`nvim`. Dropped: `Set-Alias grep findstr` (superseded by `rg`), `ll`→`ls` (superseded by eza), hardcoded `tig`/`less` paths from Git for Windows (unguarded absolute paths).
+- `nvim` is present, so `$env:EDITOR` prefers it over `micro` on Windows.
 
 ## 4. Non-goals
 
@@ -153,36 +185,61 @@ for the third shell. `usecases.md` left alone unless a recipe is Linux-only.
 *Verification:* adversarial-review subagent over the whole diff — this found a
 critical bug last time and is cheap.
 
-## 7. Open questions — blocking
+## 7. Questions — all closed
 
-**Q1. Git aliases `gc` / `gcm` / `gl` / `gp` collide with core PowerShell cmdlet
-aliases (Get-Content, Get-Command, Get-Location, Get-ItemProperty).** Three options:
+**Q1. Git-alias collision — closed by removing the whole block.** git is used from
+WSL, so Windows needs no git shortcuts at all. `g`→`git` is a plain passthrough and
+`g` is free. None of the three rename schemes was needed, and the Linux config stays
+untouched. This is the cheapest resolution available and it was his call, not a
+compromise.
 
-- **(a) Override with `-Force`** — muscle memory transfers from WSL unchanged, but it
-  breaks the repo's own core-behaviour rule and will bite when pasting PowerShell
-  snippets from the internet.
-- **(b) Keep the non-colliding seven, rename the four** (e.g. `gco`-style: `gcmt`,
-  `gcmm`, `glg`, `gpu`) — rule intact, two dialects to remember.
-- **(c) One prefix for all git shortcuts on Windows** (`g` function with subcommands,
-  or `posh-git`'s own set) — consistent, furthest from the WSL habit.
+**Q2. `rm` — closed as option (a).** `rm`/`Remove-Item` untouched; `tp` deletes to
+the Recycle Bin. Two more facts reinforce this: `Remove-Item` never uses the Recycle
+Bin, and its only prompt is per-item `-Confirm`.
 
-**Q2. `rm` safety.** Confirm: leave `rm`/`Remove-Item` untouched, add `tp` for
-Recycle-Bin deletion? Or do you want the `-Confirm` behaviour despite the
-habituation argument?
+**Q3. Drop list — closed, no objections.** All six dropped. `bottom` (`btm`) goes in
+as the cross-platform stand-in for `btop`.
 
-**Q3. Scope check on the drop list.** `grep`→`ug`, `df`→`duf`, `top`→`btop`, `py`,
-`MANPAGER`, `h`→`tldr` are all proposed for removal on Windows for reasons in §5.2.
-Objections?
+## 8. Unverified — the code has never been executed
 
-## 8. Unverified, must be checked in Phase 0
+There is no PowerShell in the agent's sandbox (`pwsh` is not installed and the proxy
+blocks the release download), so nothing below has been run even once. Everything
+here is a review-level claim, not a tested one.
 
-- Scoop availability and current version of: `fzf`, `zoxide`, `starship`, `bat`, `fd`,
-  `ripgrep`, `eza`, `jq`, `xh`, `lazygit`, `yazi`, `micro`, `procs`, `dust`, `duf`,
-  `gdu`, `tldr`/`tealdeer`, `delta`. `[?]` — `scoop search` on the machine settles it
-  faster than guessing from bucket manifests.
-- Which `FZF_*` environment variables PSFzf actually honours. `[?]`
-- Whether `pwsh` 7 is already installed, and whether Scoop or winget is already
-  present. `[?]`
-- `$PROFILE` resolved path — OneDrive redirection. `[?]`
-- Windows Terminal font: the Pure prompt needs `❯` (U+276F). Cascadia Mono covers it;
-  a Nerd Font is only needed if eza icons are wanted. `[MEM]`
+- **The whole of `profile.ps1`, `functions.ps1`, `install.ps1`.** `[INF]` Reviewed, not
+  executed. Highest-risk items follow.
+- **The dual-branch fzf preview.** `if exist "{}\" (eza …) else (bat …)` relies on fzf
+  passing `--preview` to `cmd.exe` — which it does, unconditionally, ignoring `$SHELL`
+  (junegunn/fzf#1018, #2638) `[WEB]` — and on the quoting surviving PowerShell →
+  fzf → cmd. If the preview pane shows an error, the file-only fallback is in a
+  comment beside it.
+- **`Set-Item -Path 'Function:..'`.** Chosen over `function ..` precisely because the
+  latter's parsing is not worth betting a profile load on. `[INF]`
+- **`Add-Type -AssemblyName Microsoft.VisualBasic` under PowerShell 7.** Used by `tp`.
+  `[MEM]` If it is unavailable, `tp` reports and deletes nothing.
+- **`tl`'s `GetDetailsOf` column indices** (1 = original path, 2 = date deleted).
+  `[MEM]` Cosmetic if wrong.
+- **Scoop availability of the non-core tools**: `bat`, `fd`, `ripgrep`, `eza`, `jq`,
+  `delta`, `dust`, `duf`, `procs`, `bottom`, `xh`, `lazygit`, `yazi`, `micro`,
+  `tealdeer`. `[?]` `install.ps1` attempts each and reports failures rather than
+  pre-checking, so a missing manifest is visible but not fatal.
+- **Scoop's `bucket list` / `list` output shape.** Matched as text, not as objects,
+  because it is not a stable interface and `Set-StrictMode` turns a wrong assumption
+  into a thrown error. `[INF]`
+- **Startup time under 400 ms** with starship + zoxide + PSFzf + PSReadLine
+  prediction. `[?]` Success criterion 1, unmeasured.
+- **Windows Terminal font.** The Pure prompt needs `❯` (U+276F), which Cascadia Mono
+  covers. The old profile's oh-my-posh takuya theme implies a Nerd Font is already
+  configured, so `eza --icons` should work too. `[INF]`
+
+## 9. What has actually happened
+
+| | |
+|---|---|
+| ✅ | Repo is a local git repository, 3 commits, working tree clean, `git fsck` clean |
+| ✅ | `.gitattributes` forces LF — CRLF would break `install.sh` on a Linux clone |
+| ✅ | `install.sh` marked executable in the index (the Windows mount reports no exec bit) |
+| 🔴 | **Not pushed.** No credentials in the agent's sandbox. Remote must be added and pushed by hand |
+| 🔴 | **WSL copy is still a `cp -r`**, not a clone. The drift problem is not yet solved, only made solvable |
+| 🔴 | **No PowerShell code has been run** |
+| 🔴 | `bootstrap/INSTALL.md` has no Windows section yet; `cheatsheet.md` has no PowerShell column (M4 partially done) |

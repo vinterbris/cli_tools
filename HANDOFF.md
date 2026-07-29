@@ -10,9 +10,11 @@ Snapshot of project state as of 2026-07-29. Point-in-time document — delete or
 
 ## What this project is
 
-A modern CLI environment for Sergey: tool selection, runnable shell config, and learning material. Started as a research document (`modern-cli-tools.md`), then absorbed his old Ubuntu dotfiles and turned into a deployable setup.
+A modern CLI environment for Sergey: tool selection, runnable shell config, and learning material. Started as a research document (`modern-cli-tools.md`), then absorbed his old dotfiles and turned into a deployable setup.
 
-**Target machines:** Ubuntu 24.04 under WSL2 (primary, already deployed), Pop!\_OS 22.04 (laptop, planned), Debian 12 (home server, planned).
+⚠️ **Correction, 2026-07-30.** An earlier version of this section said the absorbed dotfiles were "Ubuntu" dotfiles. They were not. His only tracked dotfiles repo, [vinterbris/dotfiles](https://github.com/vinterbris/dotfiles), is **Windows-only** — a PowerShell profile plus four starship TOMLs, one of which (`starship_pure.toml`) is the stock Pure preset. He had no Linux dotfiles. This matters because the decision "starship, not Pure — his old config ran *stock* Pure with zero customisation" was reasoning about that Windows file, not a zsh setup. The conclusion still holds; the provenance was mislabelled.
+
+**Target machines:** Ubuntu 24.04 under WSL2 (primary, already deployed), Windows 11 with PowerShell 7 (config written 2026-07-30, not yet run), Pop!\_OS 22.04 (laptop, planned), Debian 12 (home server, planned).
 
 ## Current state
 
@@ -87,7 +89,8 @@ Each of these cost real debugging time. They are the reason certain code looks t
 
 | Thread | Status |
 |---|---|
-| **Put the repo under git** | Not done. Would make the Windows↔WSL drift visible and give real rollback. Highest-value next step |
+| **Put the repo under git** | ✅ Done 2026-07-30, local only. Remote is `https://github.com/vinterbris/cli_tools.git`; **push has not happened** — no credentials available to the agent. The WSL copy is still a `cp -r`, not yet re-established as a clone |
+| **Run the PowerShell config** | Written 2026-07-30 (`dotfiles/profile.ps1`, `dotfiles/functions.ps1`, `bootstrap/install.ps1`), **never executed** — no PowerShell available in the agent's sandbox. Unverified items are listed in `prd-powershell.md` §8 |
 | **Deploy to Pop!\_OS 22.04 laptop** | Untried. Expect more tools to fall through to cargo (slow, compiles from source). `--install-managers` required unless rustup is present |
 | **Deploy to Debian 12 server** | Untried. Consider trimming `TOOLS` in `install.sh` — `yazi`, `micro`, `btop` are interactive and rarely wanted on an ssh-only box |
 | **`atuin sync` across machines** | Not set up. Needs an account. Note the privacy implication: every command from the laptop lands in the server's history and back |
