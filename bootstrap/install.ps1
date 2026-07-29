@@ -87,6 +87,10 @@ $Tools = [ordered]@{
     'fzf'      = 'core'
     'zoxide'   = 'core'
     'starship' = 'core'
+    # fills a gap that has no equivalent on the Linux side
+    'carapace' = 'windows'   # argument completion for 1000+ commands
+    'gsudo'    = 'windows'   # sudo for Windows, same console
+    'atuin'    = 'windows'   # shell history; PowerShell support since 18.11
     # everything the profile lights up when present
     'bat'      = 'quality'
     'fd'       = 'quality'
@@ -102,12 +106,27 @@ $Tools = [ordered]@{
     'yazi'     = 'quality'
     'micro'    = 'quality'
     'tealdeer' = 'quality'   # tldr
+    'hyperfine'= 'quality'   # benchmarking — used to justify the init cache
+    'ouch'     = 'quality'   # one command for every archive format
+    'glow'     = 'quality'   # markdown in the terminal; this repo is 9 .md files
 }
+
+# PowerShell Gallery modules. From the Gallery rather than Scoop's extras
+# bucket so Update-Module works and they land in the normal module path.
+$Modules = @(
+    'PSFzf'           # Ctrl+T / Alt+C, and Ctrl+R when atuin is absent
+    'Terminal-Icons'  # icons in Get-ChildItem — the reason ls stays native
+)
+
 # NOT in the list, and why:
-#   delta  — it is a git pager, configured through .gitconfig. git runs from
-#            WSL on this machine, where install.sh already handles it. On
-#            Windows it would be an installed binary nothing ever calls.
-#   git    — same reason. Its absence here is intentional, not a gap.
+#   delta        — a git pager, configured through .gitconfig. git runs from
+#                  WSL here, where install.sh already handles it. On Windows
+#                  it would be a binary nothing ever calls.
+#   git          — same reason. Its absence is intentional, not a gap.
+#   Everything   — already installed. Its CLI (es.exe) is a separate
+#                  download from voidtools and is not on Scoop.
+#   oh-my-posh   — duplicate of starship.
+#   nvim         — not used.
 
 if (-not $SkipTools) {
     # Scoop's own state is read from its directory layout, not from parsing
@@ -152,21 +171,14 @@ if (-not $SkipTools) {
         else { Warn "$t failed"; $script:Failures.Add("tool:$t") }
     }
 
-    Step "PSFzf module"
-    # From the PowerShell Gallery rather than the Scoop extras bucket, so
-    # Update-Module works and the module lands in the normal module path.
-    if (Get-Module PSFzf -ListAvailable) {
-        Ok "PSFzf already available"
-    } elseif ($DryRun) {
-        Act "Install-Module PSFzf -Scope CurrentUser"
-    } else {
-        try {
-            Install-Module PSFzf -Scope CurrentUser -Force -AllowClobber
-            Ok "installed PSFzf"
-        } catch {
-            Warn "PSFzf failed: $($_.Exception.Message)"
-            $script:Failures.Add('module:PSFzf')
-        }
+    Step "PowerShell modules"
+    foreach ($m in $Modules) {
+        if (Get-Module $m -ListAvailable) { Ok "$m already available"; continue }
+        if ($DryRun) { Act "Install-Module $m -Scope CurrentUser"; continue }
+        # Install-Module is a cmdlet, so unlike the Scoop calls it really does
+        # throw on failure — catch is meaningful here.
+        try { Install-Module $m -Scope CurrentUser -Force -AllowClobber; Ok "installed $m" }
+        catch { Warn "$m failed: $($_.Exception.Message)"; $script:Failures.Add("module:$m") }
     }
 }
 

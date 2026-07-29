@@ -198,9 +198,25 @@ function tl {
 # therefore locale-dependent. Restoring from Explorer is the reliable path.
 Set-Alias tempty Clear-RecycleBin -Force
 
+# --- elevation --------------------------------------------------
+# gsudo runs a command elevated in the SAME console, no second window.
+# `sudo` is the muscle-memory name and PowerShell has nothing called that.
+if (Get-CliBin gsudo) { Set-Alias sudo gsudo -Force }
+
+# --- Everything (voidtools) -------------------------------------
+# Instant filename search over the NTFS index — the one thing here with no
+# Linux counterpart in this repo. `es.exe` is a SEPARATE download from
+# voidtools; the GUI being installed does not provide it. Guarded, so this
+# is a no-op until es.exe is on the PATH.
+if (Get-CliBin es) {
+    function esf { es -n 50 @args }              # first 50 matches
+    function esr { es -regex @args }             # regex mode
+}
+
 # --- misc -------------------------------------------------------
 # `md` already exists as a PowerShell function (mkdir). Left alone.
 if (Get-CliBin yazi) { Set-Alias fm yazi -Force }
+if (Get-CliBin glow) { function mdv { glow -p @args } }   # markdown, paged
 
 function path { $env:PATH -split ';' | Where-Object { $_ } }
 
@@ -304,7 +320,7 @@ function Test-CliToolsSetup {
     $ourFunctions = @(
         'e','ll','la','lt','ltt','ltg','lsize','lnew','b','bp','rgh','rgf',
         'ff','fdd','fda','dsz','dus','pg','ptree','pcpu','pmem','jqc','jqr',
-        'tp','tl','path','cs','..','...','....',
+        'tp','tl','path','cs','..','...','....','mdv','esf','esr',
         'scoopupd','scoopupg','scoopup','scoopin','scooprm','scoopse','scoopst'
     )
 
@@ -317,7 +333,7 @@ function Test-CliToolsSetup {
     # whitelist dead code and left g/lg/http/fm/tempty/fe/fkill/fif with no
     # collision protection at all, while still printing "OK".
     $ourAliases = @{
-        g = 'git'; lg = 'lazygit'; http = 'xh'; fm = 'yazi'
+        g = 'git'; lg = 'lazygit'; http = 'xh'; fm = 'yazi'; sudo = 'gsudo'
         tempty = 'Clear-RecycleBin'
         fe = 'Invoke-FuzzyEdit'; fkill = 'Invoke-FuzzyKillProcess'
         fif = 'Invoke-PsFzfRipgrep'
@@ -347,7 +363,8 @@ function Test-CliToolsSetup {
     # they are not in this list. Including them would make the green "OK" line
     # unreachable on a correct setup, which trains you to ignore the output.
     $tools = 'fzf','zoxide','starship','bat','fd','rg','eza','jq',
-             'procs','dust','duf','xh','lazygit','yazi','micro','btm','tldr'
+             'procs','dust','duf','xh','lazygit','yazi','micro','btm','tldr',
+             'carapace','gsudo','atuin','hyperfine','ouch','glow'
     $missing = $tools | Where-Object { -not (Get-CliBin $_) }
     if ($missing) { Write-Host "not installed: $($missing -join ', ')" -ForegroundColor DarkYellow }
 

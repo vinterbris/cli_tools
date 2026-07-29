@@ -268,14 +268,92 @@ here is a review-level claim, not a tested one.
   | PSFzf | 458 ms | 129 — `Import-Module PSFzf` |
   | total | 460 ms | |
 
-  The 400 ms figure in success criterion 1 was invented without a baseline and refers
-  to total shell start, which is larger than this. Whether 460 ms is a problem is a
-  judgement call, not a fact: the honest statement is that ~250 ms of it (starship +
-  zoxide + binary probes) is cacheable, and the rest is module loading that is hard to
-  avoid without deferring key-handler registration. **No optimisation attempted** —
-  a cache layer is real machinery and needs to be worth it first.
+  Measured against a bare shell, averaged over 5 runs each `[RUN]`:
+
+  | | ms |
+  |---|---|
+  | `pwsh -NoProfile` | 181 |
+  | `pwsh` with the config | 847 |
+  | **cost of the config** | **666** |
+
+  That settles the earlier "is 460 ms a problem" question with data instead of a
+  guessed target: 666 ms on every new tab, and tier S+A was about to add four more
+  `init` process spawns plus two module imports on top. So the cache layer stopped
+  being optional and was built:
+
+  - `Use-CachedInit` writes each tool's generated init script to
+    `%LOCALAPPDATA%\cli_tools\cache` and dot-sources it. Staleness is decided by
+    comparing timestamps against the binary, so `scoop update` invalidates it
+    automatically. `CLI_TOOLS_NO_CACHE=1` bypasses; `Clear-CliToolsCache` wipes it.
+  - `Get-CliBin` now checks `<scoop>\shims\<name>.exe` before falling back to
+    `Get-Command`. All these tools come from Scoop and every shim is in one folder, so
+    this replaces a PATH walk with a `Test-Path` — **and needs no cache and no
+    invalidation**, which is why it is preferred over caching resolved paths.
+
+  Not measured after the change. The 400 ms criterion should be replaced with a
+  measured budget once it is.
 - ~~Windows Terminal font.~~ Resolved: `Maple-Mono-NF` is installed. `[RUN]` Only thing
   left is that Windows Terminal is actually configured to use it.
+
+## 7a. Config-file locations — the policy
+
+**Decision: the repo is the single source of truth, and tools are pointed at it with
+environment variables.** Nothing is copied into a tool's conventional location.
+Currently that means `$STARSHIP_CONFIG`; the same shape applies to `$BAT_CONFIG_PATH`
+and friends as configs appear.
+
+Rejected alternative: `install.ps1` distributing files into each tool's native
+directory. It would make a config findable when a tool is launched from outside pwsh
+(Explorer, another shell), but it reintroduces a sync step — the exact drift this
+project keeps paying for elsewhere. With one config file the trade is not close.
+Revisit at three or four.
+
+**Why there is no copy or symlink at all on Windows:** `$PROFILE` is a one-line stub
+that dot-sources `<repo>\dotfiles\profile.ps1`. zsh insists on `~/.zshrc` at a fixed
+path, so Linux needs a link; PowerShell lets the stub point anywhere. The WSL copy
+exists for a different reason — `/mnt/c` is slow and rc files are read on every shell
+start.
+
+🔴 **The repo is in the wrong directory.** It lives under
+`C:\Users\Vinterbris\_CLAUDE_DESKTOP_PROJECTS\cli_tools`, a working folder belonging to
+another tool, and that absolute path is hardcoded into `$PROFILE`. Renaming or
+reorganising those project folders breaks the shell at startup with a non-obvious
+cause. Agreed move: `C:\Users\Vinterbris\cli_tools`. Two steps — move the directory,
+re-run `install.ps1 -SkipTools` to regenerate the stub.
+
+| Thing | Location | Status |
+|---|---|---|
+| `$PROFILE` | `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` | ✅ `[RUN]` one-line stub |
+| our config | `<repo>\dotfiles\profile.ps1` + `functions.ps1` | ✅ loaded directly, no copy |
+| starship | `<repo>\dotfiles\starship.toml` via `$STARSHIP_CONFIG` | ✅ points at the repo |
+| PS modules | `Documents\PowerShell\Modules` | ✅ `[RUN]` |
+| Scoop | `~\scoop`; `$env:SCOOP` unset | ✅ `[RUN]` |
+| init cache | `%LOCALAPPDATA%\cli_tools\cache` | ✅ generated, disposable |
+| zoxide data | `%LOCALAPPDATA%\zoxide` | `[WEB]` scoop manifest |
+| bat | `%APPDATA%\bat\config`, `$BAT_CONFIG_PATH` overrides | `[MEM]` |
+| PSReadLine history | `%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\` | `[MEM]` |
+| micro, yazi, procs, tealdeer | not checked | `[?]` |
+
+## 7b. Tools added after the first working build
+
+Startup measurement forced the order here: the config already cost 666 ms, so adding
+four more `init` process spawns without caching would have pushed a new tab past a
+second.
+
+| Tool | Fills what gap |
+|---|---|
+| **carapace** | Argument completion for 1000+ commands. Before it, Tab did nothing useful for `rg`, `fd`, `scoop`, `fzf`. Requires `MenuComplete` on Tab — not a preference, the default `Complete` renders raw ANSI escapes `[WEB]` |
+| **gsudo** | Elevation in the same console. Aliased to `sudo`, a name PowerShell leaves free |
+| **Terminal-Icons** | Icons in `Get-ChildItem`. The counterpart of not aliasing `ls`: native `ls` keeps returning objects so pipelines work, and this makes it readable |
+| **atuin** | Shell history, local-only until `atuin login`. **Takes `Ctrl+R`**, mirroring the Linux load-order rule, so PSFzf is told not to claim it |
+| **hyperfine** | Benchmarking. Directly relevant to the startup question |
+| **ouch** | One command for any archive. A real Windows gap — there is no unified `tar`/`unzip` |
+| **glow** | Markdown in the terminal. This repo is nine `.md` files |
+| **Everything** | Already installed. Its CLI, `es.exe`, is a separate voidtools download and is not on Scoop, so `esf`/`esr` stay guarded no-ops until it is on PATH |
+
+Context worth keeping in view: Microsoft announced native Rust coreutils for Windows at
+Build 2026 — `ls`, `cat`, `grep`, `find`, `xargs` on uutils `[WEB]`. Some of this layer
+becomes built-in over time, which is an argument against collecting exotica.
 
 ## 8a. Adversarial review, 2026-07-30
 
@@ -320,5 +398,5 @@ Windows-side re-quoting. That still needs a live `Ctrl+T`.
 | 🔴 | **No PowerShell code has been run** |
 | ✅ | It loads and works. `Test-CliToolsSetup` reports `cli_tools: OK` — no shadowed names, all 17 tools resolvable. `z`, `ll`, `b`, `..` confirmed working by hand `[RUN]` |
 | 🔴 | **The real blocker is now documentation, not code.** His words: "остальные хз как использовать". `e`, `cs`, `path`, `tl`, `tp`, `rgh`, `ff`, `fdd`, `pg`, `Ctrl+R`, `Alt+C` and the scoop wrappers are all installed and all unused, because nothing tells him what they do. `cheatsheet.md` has no PowerShell content and `bootstrap/INSTALL.md` has no Windows section — M4 was deferred and that deferral is what is costing him now |
-| 🔴 | **One chord fires only under the Russian keyboard layout** `[RUN]`, which is backwards from expectation and not yet diagnosed. Which chord and which direction is unconfirmed. PSReadLine registers handlers against the produced character, so layout-dependent chords are a known class of problem — but the specific case needs pinning down before it is explained |
+| 🟡 | **`Ctrl+T` misbehaved and the terminal hung; `Alt+C` was fine** `[RUN]`. Working hypothesis, not yet confirmed: `FZF_CTRL_T_COMMAND` was `fd -tf -HI`, and `Ctrl+T` in `$HOME` therefore walked `AppData` — tens of thousands of files — before fzf drew anything. Changed to drop `-I` and exclude `AppData`, `node_modules`, `.git`, `$Recycle.Bin`. Settle it by timing `fd -tf -HI` versus the new form in `$HOME` |
 | 🔴 | The replace-and-backup path in `install.ps1` is still untested: `$PROFILE` did not exist, so it took the create branch |
