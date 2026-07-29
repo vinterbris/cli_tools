@@ -77,9 +77,10 @@ Binary, checkable on the machine:
 - `starship_pure.toml` in that repo is the stock Pure preset but uses the **deprecated** `vicmd_symbol` key; `dotfiles/starship.toml` has the current `vimcmd_symbol`. Nothing to salvage.
 - Worth keeping from it: `g`→`git`. Dropped: `Set-Alias grep findstr` (superseded by `rg`), `ll`→`ls` (superseded by eza), hardcoded `tig`/`less` paths from Git for Windows (unguarded absolute paths), `vim`→`nvim`.
 - ⚠️ **Corrected 2026-07-30.** An earlier revision of this section claimed "`nvim` is present, so `$env:EDITOR` prefers it". That was inferred from the presence of the `vim`→`nvim` alias and is **wrong** — nvim is not installed and he does not use it. The alias was stale. `$env:EDITOR` is `micro`, then `notepad`. Recorded because the failure mode is worth remembering: an alias in a config file is evidence that someone once intended to install something, not that they did.
-- **oh-my-posh is redundant, not heavy** — and, it turns out, not installed. It is a prompt binary in the same category as starship, not a framework like oh-my-zsh, so the ~60-files-at-startup objection never applied to it; the objection that does apply is two prompt engines and two configs. Moot here: `oh-my-posh` is absent from this machine `[RUN]`, so its `init` line in the old profile would have errored on every shell start.
-- **The old repo is a stale artefact, not a source of truth.** Three of its references point at software that is not installed: `nvim`, `oh-my-posh`, and hardcoded `tig`/`less` paths under `C:\Program Files\Git`. Nothing further should be inferred from it without checking the machine.
-- **`$PROFILE` does not currently exist** on this machine — the dry run printed no backup line, which only happens when the existing profile is absent or empty. So the old profile is not installed here at all, and `install.ps1` will create rather than replace. `[RUN]`
+- **oh-my-posh is redundant, not heavy** — and not installed here. It is a prompt binary in the same category as starship, not a framework like oh-my-zsh, so the ~60-files-at-startup objection never applied to it; the objection that does apply is two prompt engines and two configs. Moot in practice.
+- **The old repo describes a previous Windows installation that no longer exists.** This is a *different machine* — not a machine that drifted from the repo. `nvim`, `oh-my-posh` and the `C:\Program Files\Git\usr\bin` paths were all real there. So the repo is a historical record, not a stale config, and the correct way to use it is as a list of things he once chose, each to be re-decided against the current machine. Do not infer installed software from it; that mistake was already made once, with `nvim`.
+- **`$PROFILE` does not exist** on this machine — the dry run printed no backup line, which only happens when the file is absent or empty. `install.ps1` will create rather than replace, so the replace-and-backup path stays untested. `[RUN]`
+- **A Nerd Font is already installed**: `Maple-Mono-NF` `[RUN]`. Closes the font question — both `❯` and `eza --icons` will render, provided Windows Terminal is set to it.
 
 ## 4. Non-goals
 
@@ -226,17 +227,29 @@ here is a review-level claim, not a tested one.
   `delta`, `dust`, `duf`, `procs`, `bottom`, `xh`, `lazygit`, `yazi`, `micro`,
   `tealdeer`. `[?]` `install.ps1` attempts each and reports failures rather than
   pre-checking, so a missing manifest is visible but not fatal.
-- ~~Scoop's `bucket list` / `list` output shape.~~ **Resolved by the dry run, which
-  found the defect.** `scoop list` prints its `Installed apps:` header on the host
-  stream and the table on the output stream, so the text match found nothing and every
-  tool was reported as "would install" — a check that fails by silently answering
-  "no". Replaced with `Test-Path $SCOOP\apps\<name>` and `$SCOOP\buckets\<name>`: the
-  directories Scoop actually keys on, and `Test-Path` cannot half-succeed. `[RUN]`
+- **Scoop state is read from the directory layout**, `Test-Path $SCOOP\apps\<name>` and
+  `$SCOOP\buckets\<name>`, rather than by parsing `scoop list`.
+
+  ⚠️ **Retraction.** An earlier revision of this entry, and the commit message that
+  introduced the change, claimed the text-parsing version was *proven broken* by the
+  dry run because it reported all 18 tools as "would install". That inference was
+  wrong. `Get-ChildItem $HOME\scoop\apps` afterwards showed the machine has only
+  `Maple-Mono`, `Maple-Mono-NF`, `pipx` and `scoop` installed `[RUN]` — so "would
+  install" was the correct answer for all 18 and the old check was never observed to
+  fail. Absence of a match is not evidence of a broken matcher.
+
+  The directory test is still the better mechanism, on grounds that do not depend on
+  that false claim: it has no dependency on an output format that upstream is free to
+  change, and it cannot throw under `Set-StrictMode`. It is kept for those reasons
+  alone. `[INF]`
+
+  Confirmed by the run: `$env:SCOOP` is **unset** on this machine, so the
+  `$HOME\scoop` fallback is the path that actually gets used — worth knowing before
+  anyone "simplifies" it away. `[RUN]`
 - **Startup time under 400 ms** with starship + zoxide + PSFzf + PSReadLine
   prediction. `[?]` Success criterion 1, unmeasured.
-- **Windows Terminal font.** The Pure prompt needs `❯` (U+276F), which Cascadia Mono
-  covers. The old profile's oh-my-posh takuya theme implies a Nerd Font is already
-  configured, so `eza --icons` should work too. `[INF]`
+- ~~Windows Terminal font.~~ Resolved: `Maple-Mono-NF` is installed. `[RUN]` Only thing
+  left is that Windows Terminal is actually configured to use it.
 
 ## 9. What has actually happened
 
