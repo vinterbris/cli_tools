@@ -122,7 +122,10 @@ if (-not $SkipTools) {
     # No pre-flight `scoop search` parsing: the output format is not a stable
     # interface. Attempting the install and recording the failure is both
     # simpler and authoritative.
-    $installed = if ($DryRun) { '' } else { (& scoop list 2>$null | Out-String) }
+    # Queried even under -DryRun: `scoop list` is read-only, and a dry run
+    # that cannot tell "would install" from "already there" is not much of a
+    # preview.
+    $installed = (& scoop list 2>$null | Out-String)
     foreach ($t in $Tools.Keys) {
         if ($installed -match "(?m)^\s*$([regex]::Escape($t))\s") { Ok "$t already installed"; continue }
         if ($DryRun) { Act "scoop install $t   ($($Tools[$t]))"; continue }
@@ -180,7 +183,8 @@ if (-not $SkipProfile) {
             $backup = "$PROFILE.bak-$(Get-Date -Format yyyyMMdd-HHmmss)"
             Warn "existing profile will be replaced. Backup: $backup"
             if ($current -match 'oh-my-posh') {
-                Warn "the old profile initialises oh-my-posh; starship replaces it. oh-my-posh stays installed, just uninitialised."
+                Warn "the old profile initialises oh-my-posh. starship replaces it."
+                Warn "oh-my-posh is a prompt binary, not a framework — but two prompt engines means two configs. Consider: scoop uninstall oh-my-posh"
             }
             if ($DryRun) { Act "copy `$PROFILE -> $backup" }
             else { Copy-Item -LiteralPath $PROFILE -Destination $backup; Ok "backed up" }

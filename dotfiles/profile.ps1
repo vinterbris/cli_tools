@@ -50,9 +50,13 @@ $StarshipBin = Get-CliBin starship
 $ZoxideBin   = Get-CliBin zoxide
 
 # --- editor -----------------------------------------------------
-# nvim if present (it is, per the old profile), then micro to match the
-# Linux default, then notepad so $env:EDITOR is never empty.
-foreach ($e in 'nvim', 'micro', 'notepad') {
+# micro, same as the Linux config: modern keybindings (Ctrl+S saves,
+# Ctrl+Q quits), nothing modal to learn. notepad is the last resort so
+# $env:EDITOR is never empty on a machine with no tools installed.
+#
+# nvim is deliberately NOT in this chain. The old profile aliased vim→nvim,
+# but nvim is not installed and he does not use it — the alias was stale.
+foreach ($e in 'micro', 'notepad') {
     if (Get-CliBin $e) { $env:EDITOR = $e; break }
 }
 $env:VISUAL = $env:EDITOR

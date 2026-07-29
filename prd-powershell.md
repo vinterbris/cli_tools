@@ -75,8 +75,9 @@ Binary, checkable on the machine:
 - Active prompt was **oh-my-posh** (`takuya` theme); the starship lines were commented out. starship replaces it; `install.ps1` backs up the old profile and warns. oh-my-posh stays installed, just uninitialised.
 - A takuya-theme prompt implies a Nerd Font is already configured in Windows Terminal — so `eza --icons` should render.
 - `starship_pure.toml` in that repo is the stock Pure preset but uses the **deprecated** `vicmd_symbol` key; `dotfiles/starship.toml` has the current `vimcmd_symbol`. Nothing to salvage.
-- Worth keeping from it: `g`→`git`, `gsudo`→`sudo`, `vim`→`nvim`. Dropped: `Set-Alias grep findstr` (superseded by `rg`), `ll`→`ls` (superseded by eza), hardcoded `tig`/`less` paths from Git for Windows (unguarded absolute paths).
-- `nvim` is present, so `$env:EDITOR` prefers it over `micro` on Windows.
+- Worth keeping from it: `g`→`git`. Dropped: `Set-Alias grep findstr` (superseded by `rg`), `ll`→`ls` (superseded by eza), hardcoded `tig`/`less` paths from Git for Windows (unguarded absolute paths), `vim`→`nvim`.
+- ⚠️ **Corrected 2026-07-30.** An earlier revision of this section claimed "`nvim` is present, so `$env:EDITOR` prefers it". That was inferred from the presence of the `vim`→`nvim` alias and is **wrong** — nvim is not installed and he does not use it. The alias was stale. `$env:EDITOR` is `micro`, then `notepad`. Recorded because the failure mode is worth remembering: an alias in a config file is evidence that someone once intended to install something, not that they did.
+- **oh-my-posh is redundant, not heavy.** It is a prompt binary in the same category as starship, not a framework like oh-my-zsh — the ~60-files-at-startup objection does not apply to it. But running two prompt engines means two configs to keep in sync and an ambiguous answer to "why does my prompt look like that", and starship is the one that already works on WSL from the same TOML. Recommendation is to uninstall oh-my-posh rather than leave it dormant.
 
 ## 4. Non-goals
 
