@@ -88,7 +88,9 @@ $Tools = [ordered]@{
     'zoxide'   = 'core'
     'starship' = 'core'
     # fills a gap that has no equivalent on the Linux side
-    'carapace' = 'windows'   # argument completion for 1000+ commands
+    # 'carapace-bin', not 'carapace' — the app dir is carapace-bin, the shim
+    # it installs is carapace.exe. It lives in `extras`, not `main`.
+    'carapace-bin' = 'windows'   # argument completion for 1000+ commands
     'gsudo'    = 'windows'   # sudo for Windows, same console
     'atuin'    = 'windows'   # shell history; PowerShell support since 18.11
     # everything the profile lights up when present
@@ -115,8 +117,12 @@ $Tools = [ordered]@{
 # bucket so Update-Module works and they land in the normal module path.
 $Modules = @(
     'PSFzf'           # Ctrl+T / Alt+C, and Ctrl+R when atuin is absent
-    'Terminal-Icons'  # icons in Get-ChildItem — the reason ls stays native
 )
+# Terminal-Icons was added and then removed: measured at 348 ms of shell
+# startup, for icons in native `ls` output. eza already provides icons under
+# `e`/`ll`/`la`, so the only thing it bought was decoration on a command we
+# kept native for pipeline reasons. Not a defensible trade. The module is
+# left installed if it is already there; the profile no longer imports it.
 
 # NOT in the list, and why:
 #   delta        — a git pager, configured through .gitconfig. git runs from

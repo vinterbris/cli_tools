@@ -57,6 +57,11 @@ $env:CLI_DOCS = Split-Path -Parent $PSScriptRoot
 $ScoopRoot  = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $HOME 'scoop' }
 $ScoopShims = Join-Path $ScoopRoot 'shims'
 
+# NOTE on cost: a HIT is a single Test-Path, effectively free. A MISS falls
+# through to Get-Command, which walks the entire PATH and finds nothing —
+# that is the expensive case. Measured: with carapace absent, "resolve
+# binaries" cost 100 ms; the misses are the reason, not the hits. So an
+# uninstalled tool is not free here.
 function Get-CliBin {
     param([Parameter(Mandatory)][string]$Name)
     $shim = Join-Path $ScoopShims "$Name.exe"
@@ -227,13 +232,19 @@ if (Get-Module PSReadLine) {
 }
 Mark 'PSReadLine'
 
-# --- Terminal-Icons ---------------------------------------------
-# Icons in Get-ChildItem output. This is the counterpart of the decision NOT
-# to alias ls to eza: native ls keeps returning objects, so pipelines still
-# work, and this makes it readable anyway. Needs a Nerd Font, which is
-# installed (Maple-Mono-NF).
-Import-Module Terminal-Icons -ErrorAction SilentlyContinue
-Mark 'Terminal-Icons'
+# --- Terminal-Icons: REMOVED ------------------------------------
+# Measured at 348 ms of the 865 ms profile load — the single largest cost in
+# this file, by a wide margin, and it loads a format.ps1xml on every start.
+# What it bought: icons in native `ls` output. eza already gives icons under
+# `e`/`ll`/`la`, so this was decoration on the one listing command kept
+# native for pipeline reasons.
+#
+# Set CLI_TOOLS_ICONS=1 in profile.local.ps1 if you want it back knowing the
+# price.
+if ($env:CLI_TOOLS_ICONS) {
+    Import-Module Terminal-Icons -ErrorAction SilentlyContinue
+    Mark 'Terminal-Icons'
+}
 
 # --- prompt: starship, Pure preset ------------------------------
 # Same starship.toml as WSL — one file, no Windows fork. STARSHIP_CONFIG is

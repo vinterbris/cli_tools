@@ -290,8 +290,31 @@ here is a review-level claim, not a tested one.
     this replaces a PATH walk with a `Test-Path` — **and needs no cache and no
     invalidation**, which is why it is preferred over caching resolved paths.
 
-  Not measured after the change. The 400 ms criterion should be replaced with a
-  measured budget once it is.
+  **Measured again after the additions, and it got worse: 1324 ms total, 865 ms inside
+  the profile** `[RUN]`. Per stage, own cost:
+
+  | Stage | Own cost | Note |
+  |---|---|---|
+  | resolve binaries | 100 ms | up from 66. A *miss* falls through to a full PATH walk — `carapace` being absent is most of this |
+  | functions.ps1 | 48 ms | |
+  | PSReadLine | 79 ms | module load, unavoidable |
+  | **Terminal-Icons** | **348 ms** | **largest single cost in the file** |
+  | starship init | 85 ms | cached, yet barely cheaper than the 102 ms uncached — unexplained, needs a look |
+  | zoxide init | 15 ms | was 44 — the cache works here |
+  | carapace | 0 ms | not installed |
+  | atuin | 43 ms | |
+  | PSFzf | 139 ms | module load |
+
+  **Terminal-Icons removed.** 348 ms bought icons in native `ls` output, and eza
+  already provides icons under `e`/`ll`/`la` — so it was decoration on the one listing
+  command deliberately kept native for pipeline reasons. Recommending it was a bad
+  call; the cost was not checked before recommending. Now behind `CLI_TOOLS_ICONS=1`.
+
+  Open: starship's cached init still costs 85 ms. Either the cache is not being used or
+  dot-sourcing the generated script is itself the cost. Unresolved.
+
+  `carapace` is `carapace-bin` in the **extras** bucket, not `carapace` in `main` — the
+  installed app directory is `carapace-bin`, the shim is `carapace.exe`. `[WEB]`
 - ~~Windows Terminal font.~~ Resolved: `Maple-Mono-NF` is installed. `[RUN]` Only thing
   left is that Windows Terminal is actually configured to use it.
 
