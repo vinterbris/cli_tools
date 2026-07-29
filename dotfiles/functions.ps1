@@ -142,9 +142,15 @@ if (Get-Command scoop -ErrorAction SilentlyContinue) {
 #
 # UNVERIFIED: Microsoft.VisualBasic ships with the PowerShell 7 runtime on
 # Windows. If Add-Type fails, tp reports it rather than deleting anything.
+#
+# ValueFromRemainingArguments is what makes `tp a.txt b.txt` work. Without it
+# a [string[]] parameter has a single positional slot, so the second argument
+# is rejected — the same trap as `Get-ChildItem a b`. Since tp stands in for
+# rm, space-separated arguments are the expected form, not a nicety.
 function tp {
     [CmdletBinding()]
-    param([Parameter(Mandatory, Position = 0, ValueFromPipeline)][string[]]$Path)
+    param([Parameter(Mandatory, Position = 0, ValueFromPipeline, ValueFromRemainingArguments)]
+          [string[]]$Path)
     begin {
         $ok = $true
         try { Add-Type -AssemblyName Microsoft.VisualBasic -ErrorAction Stop }
@@ -160,7 +166,12 @@ function tp {
     process {
         if (-not $ok) { return }
         foreach ($p in $Path) {
-            foreach ($item in (Resolve-Path -LiteralPath $p -ErrorAction SilentlyContinue)) {
+            # Resolve-Path yielding nothing must not pass silently. `tp fiel.txt`
+            # would otherwise print nothing, delete nothing, and look like it
+            # worked — the worst outcome for a delete command.
+            $resolved = Resolve-Path -LiteralPath $p -ErrorAction SilentlyContinue
+            if (-not $resolved) { Write-Warning "tp: not found: $p"; continue }
+            foreach ($item in $resolved) {
                 $full = $item.Path
                 if (Test-Path -LiteralPath $full -PathType Container) {
                     [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($full, $ui, $rb)
@@ -176,10 +187,11 @@ function tp {
 # List the Recycle Bin. 0xA is the ssfBITBUCKET special folder.
 function tl {
     $shell = New-Object -ComObject Shell.Application
-    $shell.NameSpace(0xA).Items() |
+    $bin   = $shell.NameSpace(0xA)      # resolved once, not per property
+    $bin.Items() |
         Select-Object @{n='Name';e={$_.Name}},
-                      @{n='Deleted';e={$shell.NameSpace(0xA).GetDetailsOf($_, 2)}},
-                      @{n='OriginalPath';e={$shell.NameSpace(0xA).GetDetailsOf($_, 1)}}
+                      @{n='Deleted';e={$bin.GetDetailsOf($_, 2)}},
+                      @{n='OriginalPath';e={$bin.GetDetailsOf($_, 1)}}
 }
 
 # No `tre` (restore): the Shell verb for undelete is display-name based and
@@ -287,28 +299,57 @@ function cs {
 #  CLI_TOOLS_SELFCHECK=1 for one shell start.
 # ─────────────────────────────────────────────────────────────
 function Test-CliToolsSetup {
-    $defined = @(
+    # Names this config defines as FUNCTIONS. Any of these resolving to an
+    # alias means the function is unreachable.
+    $ourFunctions = @(
         'e','ll','la','lt','ltt','ltg','lsize','lnew','b','bp','rgh','rgf',
         'ff','fdd','fda','dsz','dus','pg','ptree','pcpu','pmem','jqc','jqr',
         'tp','tl','path','cs','..','...','....',
         'scoopupd','scoopupg','scoopup','scoopin','scooprm','scoopse','scoopst'
     )
-    $shadowed = foreach ($n in $defined) {
-        $cmd = Get-Command $n -ErrorAction SilentlyContinue
-        if ($cmd -and $cmd.CommandType -eq 'Alias' -and
-            $cmd.Definition -notin @('Invoke-FuzzyEdit','Invoke-FuzzyKillProcess','Invoke-PsFzfRipgrep','Clear-RecycleBin')) {
-            [pscustomobject]@{ Name = $n; ShadowedBy = $cmd.Definition }
-        }
-    }
-    if ($shadowed) {
-        Write-Warning 'These names resolve to an alias, not to this config''s function:'
-        $shadowed | Format-Table -AutoSize | Out-String | Write-Host
+
+    # Names this config defines as ALIASES, mapped to what they must point at.
+    # These are checked differently: the failure is not "it is an alias" but
+    # "it is an alias to something other than what we set".
+    #
+    # An earlier version omitted this table entirely and whitelisted the
+    # alias targets inside the function-collision test instead. That made the
+    # whitelist dead code and left g/lg/http/fm/tempty/fe/fkill/fif with no
+    # collision protection at all, while still printing "OK".
+    $ourAliases = @{
+        g = 'git'; lg = 'lazygit'; http = 'xh'; fm = 'yazi'
+        tempty = 'Clear-RecycleBin'
+        fe = 'Invoke-FuzzyEdit'; fkill = 'Invoke-FuzzyKillProcess'
+        fif = 'Invoke-PsFzfRipgrep'
     }
 
-    $tools = 'fzf','zoxide','starship','bat','fd','rg','eza','jq','git',
+    $problems = @(
+        foreach ($n in $ourFunctions) {
+            $cmd = Get-Command $n -ErrorAction SilentlyContinue
+            if ($cmd -and $cmd.CommandType -eq 'Alias') {
+                [pscustomobject]@{ Name = $n; Problem = "shadowed by alias -> $($cmd.Definition)" }
+            }
+        }
+        foreach ($n in $ourAliases.Keys) {
+            $cmd = Get-Command $n -ErrorAction SilentlyContinue
+            if (-not $cmd) { continue }   # its tool is not installed; fine
+            if ($cmd.CommandType -ne 'Alias' -or $cmd.Definition -ne $ourAliases[$n]) {
+                [pscustomobject]@{ Name = $n; Problem = "resolves to $($cmd.CommandType) $($cmd.Definition), expected alias -> $($ourAliases[$n])" }
+            }
+        }
+    )
+    if ($problems) {
+        Write-Warning 'Name collisions — these do not resolve to what this config defines:'
+        $problems | Format-Table -AutoSize | Out-String | Write-Host
+    }
+
+    # git and delta are deliberately absent on Windows (driven from WSL), so
+    # they are not in this list. Including them would make the green "OK" line
+    # unreachable on a correct setup, which trains you to ignore the output.
+    $tools = 'fzf','zoxide','starship','bat','fd','rg','eza','jq',
              'procs','dust','duf','xh','lazygit','yazi','micro','btm','tldr'
     $missing = $tools | Where-Object { -not (Get-CliBin $_) }
     if ($missing) { Write-Host "not installed: $($missing -join ', ')" -ForegroundColor DarkYellow }
 
-    if (-not $shadowed -and -not $missing) { Write-Host 'cli_tools: OK' -ForegroundColor Green }
+    if (-not $problems -and -not $missing) { Write-Host 'cli_tools: OK' -ForegroundColor Green }
 }

@@ -68,6 +68,13 @@ Mark 'resolve binaries'
 #
 # nvim is deliberately NOT in this chain. The old profile aliased vim→nvim,
 # but nvim is not installed and he does not use it — the alias was stale.
+#
+# A BARE NAME here, not the resolved path from Get-CliBin, unlike everywhere
+# else in this file. Reviewed and kept deliberately: EDITOR is consumed by
+# programs that hand it to a POSIX-ish shell — git's editor invocation being
+# the obvious one — where a Windows path full of backslashes gets mangled and
+# a bare name resolved through PATH does not. The full-path rule exists for
+# strings that reach cmd.exe, which this one does not.
 foreach ($e in 'micro', 'notepad') {
     if (Get-CliBin $e) { $env:EDITOR = $e; break }
 }
@@ -87,6 +94,7 @@ if ($BatBin) {
 # variables and have no PowerShell equivalent. Per-widget preview options
 # therefore go into _PSFZF_FZF_DEFAULT_OPTS, which PSFzf swaps in for the
 # duration of its own calls, leaving a bare `fzf` invocation clean.
+$FzfPreviewCmd = $null
 if ($FzfBin) {
     $env:FZF_DEFAULT_OPTS = '--height 60% --layout=reverse --border --info=inline'
 
@@ -121,8 +129,11 @@ if ($FzfBin) {
         } else {
             'dir /b "{}"'
         }
-        $preview = "if exist ""{}\"" ($dirPrev) else ($filePrev)"
-        $env:_PSFZF_FZF_DEFAULT_OPTS = "$($env:FZF_DEFAULT_OPTS) --preview '$preview'"
+        # Only the command is built here. _PSFZF_FZF_DEFAULT_OPTS itself is
+        # assigned at the very end of this file, AFTER profile.local.ps1: it
+        # embeds a copy of FZF_DEFAULT_OPTS, so baking it now would mean a
+        # local override of FZF_DEFAULT_OPTS silently never reached PSFzf.
+        $FzfPreviewCmd = "if exist ""{}\"" ($dirPrev) else ($filePrev)"
     }
 }
 
@@ -212,6 +223,14 @@ Mark 'PSFzf'
 
 $localProfile = Join-Path $PSScriptRoot 'profile.local.ps1'
 if (Test-Path $localProfile) { . $localProfile }
+
+# --- derived from the final FZF_DEFAULT_OPTS ---------------------
+# Deliberately last. PSFzf reads this variable when a chord fires, not now,
+# so assigning it here means profile.local.ps1 can still change
+# FZF_DEFAULT_OPTS and have that reach the Ctrl+T / Alt+C preview.
+if ($FzfPreviewCmd) {
+    $env:_PSFZF_FZF_DEFAULT_OPTS = "$($env:FZF_DEFAULT_OPTS) --preview '$FzfPreviewCmd'"
+}
 Mark 'total'
 
 # --- self-check --------------------------------------------------

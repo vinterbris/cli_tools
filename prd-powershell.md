@@ -265,6 +265,34 @@ here is a review-level claim, not a tested one.
 - ~~Windows Terminal font.~~ Resolved: `Maple-Mono-NF` is installed. `[RUN]` Only thing
   left is that Windows Terminal is actually configured to use it.
 
+## 8a. Adversarial review, 2026-07-30
+
+Run as a separate reviewing agent over the three `.ps1` files, with the fixed items
+listed as out of scope so it could not spend effort on them. Nine findings, eight
+accepted.
+
+| Severity | Finding | Resolution |
+|---|---|---|
+| HIGH | `try/catch` around `& scoop install` cannot reliably catch a failure — a native command sets `$LASTEXITCODE` rather than throwing, and `scoop` may resolve to a `.ps1` shim where even that is unreliable. The whole failure report was potentially decorative | **Fixed.** Success is now judged by post-condition: `Test-Path $SCOOP\apps\<name>` after the attempt. The directory exists or it does not; no error-reporting convention to trust |
+| MED-HIGH | `tp` on a typo'd path did nothing and said nothing — `Resolve-Path -ErrorAction SilentlyContinue` yields zero iterations | **Fixed.** Warns per unresolved path. Worst possible failure mode for a delete command |
+| MEDIUM | `tp a.txt b.txt` failed: a `[string[]]` parameter has one positional slot | **Fixed** with `ValueFromRemainingArguments`. Space-separated arguments are the expected form for an `rm` stand-in |
+| MEDIUM | `Test-CliToolsSetup` never checked `g`, `lg`, `http`, `fm`, `tempty`, `fe`, `fkill`, `fif`. The alias-target whitelist that was supposed to cover them was **dead code**, so those eight names had zero collision protection while the check still printed OK | **Fixed.** Aliases are now a name→expected-target table, checked for pointing at the right thing, rather than whitelisted out of the test |
+| MEDIUM | `git` was in the missing-tools list, but its absence on Windows is intentional — so the green OK line was unreachable on a correct setup, training you to ignore the output | **Fixed.** `git` and `delta` removed from the check, with the reason in a comment |
+| LOW | `_PSFZF_FZF_DEFAULT_OPTS` embedded a copy of `FZF_DEFAULT_OPTS` at load time, so a `profile.local.ps1` override of the latter silently never reached PSFzf | **Fixed.** Only the preview command is built early; the variable is assigned last, after the local profile |
+| LOW | `delta` was installed but referenced nowhere — it is a git pager configured through `.gitconfig`, and git runs from WSL | **Fixed.** Dropped from the Windows tool list, with the reason recorded |
+| COSMETIC | `tl` resolved `NameSpace(0xA)` three times | **Fixed.** Resolved once |
+| LOW | `$env:EDITOR` is a bare name rather than the resolved path, inconsistent with the rest of the file | **Rejected, with reason.** EDITOR is consumed by programs that pass it to a POSIX-ish shell — git's editor invocation being the obvious one — where a Windows path full of backslashes is mangled and a PATH-resolved bare name is not. The full-path rule exists for strings that reach `cmd.exe`; this one does not. Comment added so it is not "fixed" later |
+
+Checked and confirmed **not** bugs, recorded so they are not re-litigated: variable
+visibility inside `cs` and `Mark` (both files dot-source into the same scope, and
+functions resolve free variables lexically); `$ok` across `tp`'s `begin`/`process`;
+`$Matches` staleness in the `cs` heading scan; and `$sections.Title` / `$heads.Count`
+with exactly one heading (PowerShell 7 gives scalars synthetic `Count` and `[0]`).
+
+The reviewer traced both preview strings character by character and found the quoting
+correctly paired, while noting — correctly — that static analysis cannot settle fzf's
+Windows-side re-quoting. That still needs a live `Ctrl+T`.
+
 ## 9. What has actually happened
 
 | | |

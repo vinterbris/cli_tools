@@ -93,7 +93,6 @@ $Tools = [ordered]@{
     'ripgrep'  = 'quality'
     'eza'      = 'quality'
     'jq'       = 'quality'
-    'delta'    = 'quality'
     'dust'     = 'quality'
     'duf'      = 'quality'
     'procs'    = 'quality'
@@ -104,6 +103,11 @@ $Tools = [ordered]@{
     'micro'    = 'quality'
     'tealdeer' = 'quality'   # tldr
 }
+# NOT in the list, and why:
+#   delta  — it is a git pager, configured through .gitconfig. git runs from
+#            WSL on this machine, where install.sh already handles it. On
+#            Windows it would be an installed binary nothing ever calls.
+#   git    — same reason. Its absence here is intentional, not a gap.
 
 if (-not $SkipTools) {
     # Scoop's own state is read from its directory layout, not from parsing
@@ -119,12 +123,20 @@ if (-not $SkipTools) {
     $ScoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $HOME 'scoop' }
     Ok "scoop root: $ScoopRoot"
 
+    # Success is judged by the POST-CONDITION, not by whether the command
+    # threw. A native command that fails writes to stderr and sets
+    # $LASTEXITCODE rather than raising a catchable error, and `scoop` may
+    # resolve to a .ps1 shim, where even $LASTEXITCODE is unreliable. A
+    # try/catch alone would make every "installed" line decorative. The
+    # directory either exists afterwards or it does not.
     Step "Scoop buckets"
     foreach ($b in $Buckets) {
-        if (Test-Path (Join-Path $ScoopRoot "buckets\$b")) { Ok "$b already added"; continue }
+        $bucketPath = Join-Path $ScoopRoot "buckets\$b"
+        if (Test-Path $bucketPath) { Ok "$b already added"; continue }
         if ($DryRun) { Act "scoop bucket add $b"; continue }
-        try { & scoop bucket add $b | Out-Null; Ok "added $b" }
-        catch { Warn "bucket $b failed: $($_.Exception.Message)"; $script:Failures.Add("bucket:$b") }
+        try { & scoop bucket add $b | Out-Null } catch { Write-Verbose $_.Exception.Message }
+        if (Test-Path $bucketPath) { Ok "added $b" }
+        else { Warn "bucket $b failed"; $script:Failures.Add("bucket:$b") }
     }
 
     Step "Tools"
@@ -132,10 +144,12 @@ if (-not $SkipTools) {
     # settled by attempting the install and recording the failure, which is
     # simpler and authoritative.
     foreach ($t in $Tools.Keys) {
-        if (Test-Path (Join-Path $ScoopRoot "apps\$t")) { Ok "$t already installed"; continue }
+        $appPath = Join-Path $ScoopRoot "apps\$t"
+        if (Test-Path $appPath) { Ok "$t already installed"; continue }
         if ($DryRun) { Act "scoop install $t   ($($Tools[$t]))"; continue }
-        try { & scoop install $t | Out-Null; Ok "installed $t" }
-        catch { Warn "$t failed: $($_.Exception.Message)"; $script:Failures.Add("tool:$t") }
+        try { & scoop install $t | Out-Null } catch { Write-Verbose $_.Exception.Message }
+        if (Test-Path $appPath) { Ok "installed $t" }
+        else { Warn "$t failed"; $script:Failures.Add("tool:$t") }
     }
 
     Step "PSFzf module"
