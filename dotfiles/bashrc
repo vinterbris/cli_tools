@@ -1,0 +1,64 @@
+# ─────────────────────────────────────────────────────────────
+#  bashrc — bash-specific init. Portable config lives in ~/.shell_common
+#  Install: ln -sf <repo>/dotfiles/bashrc ~/.bashrc
+#  Debian ships a default ~/.bashrc; back it up before replacing.
+# ─────────────────────────────────────────────────────────────
+
+# Interactive shells only
+case $- in
+  *i*) ;;
+    *) return ;;
+esac
+
+[ -f ~/.shell_common ] && . ~/.shell_common
+
+# --- history ----------------------------------------------------
+HISTCONTROL=ignoreboth:erasedups
+HISTSIZE=50000
+HISTFILESIZE=50000
+HISTTIMEFORMAT='%F %T '
+shopt -s histappend        # append, don't overwrite
+shopt -s cmdhist           # multi-line commands as one entry
+shopt -s checkwinsize
+shopt -s autocd            # `foo` == `cd foo` (bash >= 4.0)
+shopt -s globstar          # `**` recursive glob
+shopt -s cdspell dirspell  # fix minor typos in cd targets
+
+# --- completion -------------------------------------------------
+if ! shopt -oq posix; then
+  if [ -f /usr/share/bash-completion/bash_completion ]; then
+    . /usr/share/bash-completion/bash_completion
+  elif [ -f /etc/bash_completion ]; then
+    . /etc/bash_completion
+  fi
+fi
+
+# --- tool init --------------------------------------------------
+# Order matters:
+#   zoxide AFTER any cd alias   — otherwise the alias wins
+#   atuin  AFTER fzf            — otherwise fzf keeps Ctrl-R
+#   starship AFTER both
+# fzf >= 0.48 has `--bash`; Ubuntu 24.04 ships 0.44, hence the fallback
+if command -v fzf >/dev/null; then
+  _fzf_init="$(fzf --bash 2>/dev/null)"
+  if [ -n "$_fzf_init" ]; then
+    eval "$_fzf_init"
+  else
+    for _f in /usr/share/doc/fzf/examples/key-bindings.bash \
+              /usr/share/doc/fzf/examples/completion.bash \
+              /usr/share/fzf/key-bindings.bash \
+              /usr/share/fzf/completion.bash; do
+      [ -f "$_f" ] && . "$_f"
+    done
+    unset _f
+  fi
+  unset _fzf_init
+fi
+
+command -v zoxide   >/dev/null && eval "$(zoxide init bash)"
+command -v atuin    >/dev/null && eval "$(atuin init bash)"
+command -v starship >/dev/null && eval "$(starship init bash)"
+
+# --- local overrides (untracked) --------------------------------
+[ -f ~/.bashrc.local ] && . ~/.bashrc.local
+return 0

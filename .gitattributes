@@ -1,0 +1,7 @@
+# LF everywhere. This repo is checked out on Windows, WSL, and Linux from the
+# same history; shell scripts break under CRLF, and PowerShell 7 reads LF fine.
+* text=auto eol=lf
+
+# Never touch binaries.
+*.pdf  binary
+*.png  binary

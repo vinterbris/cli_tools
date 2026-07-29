@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────
+#  zshrc — zsh-specific init. Portable config lives in ~/.shell_common
+#  Install: ln -sf <repo>/dotfiles/zshrc ~/.zshrc
+#
+#  No oh-my-zsh: it sources ~60 files at startup and hides what is
+#  actually loaded. Two `source` lines replace it.
+# ─────────────────────────────────────────────────────────────
+
+[ -f ~/.shell_common ] && . ~/.shell_common
+
+# --- zsh-native quality of life ---------------------------------
+setopt AUTO_CD                       # `foo` == `cd foo`
+setopt AUTO_PUSHD PUSHD_IGNORE_DUPS  # `cd -<Tab>` walks the stack
+setopt HIST_IGNORE_ALL_DUPS SHARE_HISTORY EXTENDED_HISTORY
+setopt HIST_REDUCE_BLANKS HIST_VERIFY
+setopt INTERACTIVE_COMMENTS          # `#` comments at the prompt
+setopt NO_BEEP
+HISTSIZE=50000
+SAVEHIST=50000
+HISTFILE=~/.zsh_history
+
+# --- completion (must precede plugins that register completions) --
+# linuxbrew site-functions; hardcoded — `brew --prefix` forks a process
+# HOMEBREW_PREFIX is set by ~/.shell_common, no `brew --prefix` fork needed
+[ -n "$HOMEBREW_PREFIX" ] && [ -d "$HOMEBREW_PREFIX/share/zsh/site-functions" ] && \
+  fpath+=("$HOMEBREW_PREFIX/share/zsh/site-functions")
+
+autoload -Uz compinit && compinit
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'   # case-insensitive
+zstyle ':completion:*' menu select
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+
+# --- tool init --------------------------------------------------
+# Order matters:
+#   zoxide AFTER any cd alias   — otherwise the alias wins
+#   atuin  AFTER fzf            — otherwise fzf keeps Ctrl-R
+#   starship AFTER both
+# fzf >= 0.48 has `--zsh`; Ubuntu 24.04 ships 0.44, hence the fallback
+if command -v fzf >/dev/null; then
+  _fzf_init="$(fzf --zsh 2>/dev/null)"
+  if [ -n "$_fzf_init" ]; then
+    eval "$_fzf_init"
+  else
+    for _f in /usr/share/doc/fzf/examples/key-bindings.zsh \
+              /usr/share/doc/fzf/examples/completion.zsh \
+              /usr/share/fzf/key-bindings.zsh \
+              /usr/share/fzf/completion.zsh; do
+      [ -f "$_f" ] && . "$_f"
+    done
+    unset _f
+  fi
+  unset _fzf_init
+fi
+
+command -v zoxide   >/dev/null && eval "$(zoxide init zsh)"
+command -v atuin    >/dev/null && eval "$(atuin init zsh)"
+command -v starship >/dev/null && eval "$(starship init zsh)"
+
+# --- plugins ----------------------------------------------------
+# git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions      ~/.zsh/zsh-autosuggestions
+# git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting  ~/.zsh/zsh-syntax-highlighting
+ZSH_AUTOSUGGEST_STRATEGY=(match_prev_cmd history completion)
+[ -f ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
+  . ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# --- local overrides (untracked) --------------------------------
+# Sourced BEFORE syntax-highlighting: anything defining widgets or
+# aliases after it would go unhighlighted.
+[ -f ~/.zshrc.local ] && . ~/.zshrc.local
+
+# MUST be last of everything: it wraps the line editor, and anything
+# sourced after it goes unhighlighted.
+[ -f ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
+  . ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+return 0

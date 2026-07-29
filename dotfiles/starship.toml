@@ -1,0 +1,63 @@
+# Starship — Pure emulation.
+# Verbatim from the official preset, so it can be re-derived at any time:
+#   starship preset pure-preset -o ~/.config/starship.toml
+# Source: https://starship.rs/presets/pure-preset
+#
+# Install: ln -sf <repo>/dotfiles/starship.toml ~/.config/starship.toml
+#
+# Behaviour notes:
+#   username / hostname  — hidden unless root or over SSH (starship defaults)
+#   cmd_duration         — appears above 2000ms by default (Pure used 5s)
+#   git_status symbols   — zero-width by design; the `*` in colour 218 is the
+#                          only dirty indicator, matching Pure
+
+"$schema" = 'https://starship.rs/config-schema.json'
+
+format = """
+$username\
+$hostname\
+$directory\
+$git_branch\
+$git_state\
+$git_status\
+$cmd_duration\
+$line_break\
+$python\
+$character"""
+
+[directory]
+style = "blue"
+
+[character]
+success_symbol = "[❯](purple)"
+error_symbol = "[❯](red)"
+vimcmd_symbol = "[❮](green)"
+
+[git_branch]
+format = "[$branch]($style)"
+style = "bright-black"
+
+[git_status]
+format = "[[(*$conflicted$untracked$modified$staged$renamed$deleted)](218) ($ahead_behind$stashed)]($style)"
+style = "cyan"
+conflicted = "​"
+untracked = "​"
+modified = "​"
+staged = "​"
+renamed = "​"
+deleted = "​"
+stashed = "≡"
+
+[git_state]
+format = '\([$state( $progress_current/$progress_total)]($style)\) '
+style = "bright-black"
+
+[cmd_duration]
+format = "[$duration]($style) "
+style = "yellow"
+
+[python]
+format = "[$virtualenv]($style) "
+style = "bright-black"
+detect_extensions = []
+detect_files = []

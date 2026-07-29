@@ -1,0 +1,15 @@
+# Machine-local overrides are never tracked — they live in $HOME, not here,
+# but guard against a stray copy landing in the repo.
+*.local
+*.local.ps1
+profile.local.ps1
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+
+# Nothing generated is tracked. Rendered PDF/HTML output goes to archive/,
+# which IS tracked deliberately — see archive/ in README.md.

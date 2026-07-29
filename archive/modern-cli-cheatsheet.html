@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Modern CLI Tools — Cheatsheet</title>
+<style>
+  @page { size: A4; margin: 10mm 9mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 8.7pt; line-height: 1.3; color: #111; margin: 0;
+  }
+  code, .cmd { font-family: "DejaVu Sans Mono", "Menlo", Consolas, monospace; }
+  h1 {
+    font-size: 19pt; margin: 0 0 1.5mm 0; letter-spacing: -0.2pt;
+  }
+  .sub { font-size: 8.8pt; color: #555; margin: 0 0 3mm 0; }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  .cols { column-count: 3; column-gap: 4.5mm; }
+  .box {
+    break-inside: avoid; border: 0.4pt solid #bbb; border-radius: 2pt;
+    margin: 0 0 2.4mm 0; padding: 1.4mm 1.8mm 1.8mm 1.8mm;
+  }
+  .box h2 {
+    font-size: 9.8pt; margin: 0 0 1.4mm 0; padding: 0 0 0.8mm 0;
+    border-bottom: 0.4pt solid #ddd; letter-spacing: -0.1pt;
+  }
+  .box h2 .rep { font-weight: 400; color: #666; font-size: 7.6pt; }
+  table { width: 100%; border-collapse: collapse; }
+  td { vertical-align: top; padding: 0.35mm 0; }
+  td.c { width: 44%; padding-right: 1.4mm; white-space: nowrap;
+         font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace;
+         font-size: 8.2pt; color: #000; }
+  td.d { color: #444; font-size: 8.1pt; }
+  .note { font-size: 7.5pt; color: #666; font-style: italic; margin-top: 1mm; }
+  .keys { font-size: 8.1pt; color: #333; }
+  .keys b { font-family: "DejaVu Sans Mono", monospace; font-weight: 700; }
+  .tier { font-size: 8.1pt; margin-bottom: 2mm; }
+  .tier b { font-size: 9.4pt; }
+  .warn { background: #f6f6f6; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ PAGE 1 ══════════════════ -->
+<div class="page">
+<h1>Modern CLI Tools — Cheatsheet</h1>
+<p class="sub">Rule: new names for new tools; core commands keep core behaviour. Never alias <code>grep</code>/<code>find</code> to an incompatible tool.</p>
+
+<div class="cols">
+
+  <div class="box">
+    <h2>rg <span class="rep">— grep -r</span></h2>
+    <table>
+      <tr><td class="c">rg pattern</td><td class="d">recursive search</td></tr>
+      <tr><td class="c">rg -i / -w</td><td class="d">no-case / whole word</td></tr>
+      <tr><td class="c">rg -F 'lit.str'</td><td class="d">fixed string</td></tr>
+      <tr><td class="c">rg -l pat</td><td class="d">filenames only</td></tr>
+      <tr><td class="c">rg -tpy pat</td><td class="d">only .py (-Tpy = excl.)</td></tr>
+      <tr><td class="c">rg -g '*.conf' p</td><td class="d">glob filter</td></tr>
+      <tr><td class="c">rg -C3 pat</td><td class="d">3 lines context</td></tr>
+      <tr><td class="c">rg -uu pat</td><td class="d">ignore .gitignore+hidden</td></tr>
+      <tr><td class="c">rg --files</td><td class="d">list searchable files</td></tr>
+    </table>
+    <div class="note">ugrep (ug) = grep-flag-compatible alternative.</div>
+  </div>
+
+  <div class="box">
+    <h2>fd <span class="rep">— find</span></h2>
+    <table>
+      <tr><td class="c">fd pattern</td><td class="d">regex on filename</td></tr>
+      <tr><td class="c">fd -e md</td><td class="d">by extension</td></tr>
+      <tr><td class="c">fd -tf / -td</td><td class="d">files / dirs</td></tr>
+      <tr><td class="c">fd -H / -I</td><td class="d">hidden / ignore .gitignore</td></tr>
+      <tr><td class="c">fd -g '*.tar.gz'</td><td class="d">glob mode</td></tr>
+      <tr><td class="c">fd -d 2 pat</td><td class="d">max depth</td></tr>
+      <tr><td class="c">fd . dir -x cmd</td><td class="d">exec per result</td></tr>
+      <tr><td class="c">fd -0 | xargs -0</td><td class="d">null-safe pipe</td></tr>
+    </table>
+  </div>
+
+  <div class="box">
+    <h2>fzf <span class="rep">— interactive filter</span></h2>
+    <table>
+      <tr><td class="c">Ctrl-R</td><td class="d">fuzzy history</td></tr>
+      <tr><td class="c">Ctrl-T</td><td class="d">insert file path</td></tr>
+      <tr><td class="c">Alt-C</td><td class="d">cd into picked dir</td></tr>
+      <tr><td class="c">**&lt;Tab&gt;</td><td class="d">fuzzy path completion</td></tr>
+      <tr><td class="c">cmd | fzf -m</td><td class="d">multi-select (Tab)</td></tr>
+      <tr><td class="c">--preview '…{}'</td><td class="d">preview pane</td></tr>
+    </table>
+    <div class="keys" style="margin-top:1mm">
+      In-picker: <b>Ctrl-J/K</b> move · <b>Tab</b> mark · <b>Ctrl-/</b> toggle preview
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>bat <span class="rep">— cat (reading)</span></h2>
+    <table>
+      <tr><td class="c">bat file.py</td><td class="d">highlight + numbers</td></tr>
+      <tr><td class="c">bat -p file</td><td class="d">plain, copy-safe</td></tr>
+      <tr><td class="c">bat -A file</td><td class="d">show hidden chars</td></tr>
+      <tr><td class="c">bat -r 20:40 f</td><td class="d">line range</td></tr>
+      <tr><td class="c">bat -l json &lt; f</td><td class="d">force language</td></tr>
+      <tr><td class="c">bat --diff f</td><td class="d">only git-changed lines</td></tr>
+    </table>
+    <div class="note">Pipe-safe: acts as cat when not a TTY.</div>
+  </div>
+
+  <div class="box">
+    <h2>eza <span class="rep">— ls</span></h2>
+    <table>
+      <tr><td class="c">eza -lh --git</td><td class="d">long + git status</td></tr>
+      <tr><td class="c">--icons=auto</td><td class="d">Nerd Font icons</td></tr>
+      <tr><td class="c">eza -la</td><td class="d">long + hidden</td></tr>
+      <tr><td class="c">eza --tree -L2</td><td class="d">replaces tree</td></tr>
+      <tr><td class="c">--sort=size -r</td><td class="d">largest first</td></tr>
+      <tr><td class="c">--sort=modified -r</td><td class="d">newest first</td></tr>
+      <tr><td class="c">--total-size</td><td class="d">real dir sizes (slow)</td></tr>
+    </table>
+    <div class="note">exa is dead — use eza.</div>
+  </div>
+
+  <div class="box">
+    <h2>zoxide <span class="rep">— cd</span></h2>
+    <table>
+      <tr><td class="c">z foo</td><td class="d">jump to best match</td></tr>
+      <tr><td class="c">z foo bar</td><td class="d">multi-keyword match</td></tr>
+      <tr><td class="c">zi foo</td><td class="d">interactive pick (fzf)</td></tr>
+      <tr><td class="c">z -</td><td class="d">previous dir</td></tr>
+      <tr><td class="c">zoxide query -l</td><td class="d">dump database</td></tr>
+    </table>
+  </div>
+
+  <div class="box">
+    <h2>btop <span class="rep">— top / htop</span></h2>
+    <div class="keys">
+      <b>Esc</b> menu · <b>f</b> filter · <b>t</b> tree view · <b>+/−</b> expand<br>
+      <b>1 2 3 4</b> toggle CPU/mem/net/proc boxes<br>
+      <b>k</b> kill · <b>Enter</b> process detail · <b>q</b> quit
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>gdu <span class="rep">— ncdu</span></h2>
+    <table>
+      <tr><td class="c">gdu /</td><td class="d">interactive TUI</td></tr>
+      <tr><td class="c">gdu -n /var</td><td class="d">non-interactive</td></tr>
+      <tr><td class="c">gdu -d /home</td><td class="d">show devices</td></tr>
+    </table>
+    <div class="keys" style="margin-top:1mm">
+      In-app: <b>d</b> delete · <b>r</b> rescan · <b>n/s/c</b> sort name/size/count · <b>Enter</b> descend
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>duf <span class="rep">— df (NOT du)</span></h2>
+    <table>
+      <tr><td class="c">duf</td><td class="d">all mounts</td></tr>
+      <tr><td class="c">duf --only local</td><td class="d">local FS only</td></tr>
+      <tr><td class="c">--hide-fs tmpfs</td><td class="d">hide noise</td></tr>
+      <tr><td class="c">duf --sort size</td><td class="d">sort</td></tr>
+    </table>
+  </div>
+
+  <div class="box">
+    <h2>dust <span class="rep">— du (non-interactive)</span></h2>
+    <table>
+      <tr><td class="c">dust</td><td class="d">size tree of cwd</td></tr>
+      <tr><td class="c">dust -d 2 /var</td><td class="d">limit depth</td></tr>
+      <tr><td class="c">dust -r</td><td class="d">reverse order</td></tr>
+    </table>
+  </div>
+
+  <div class="box">
+    <h2>procs <span class="rep">— ps aux | grep</span></h2>
+    <table>
+      <tr><td class="c">procs nginx</td><td class="d">search name/pid/user</td></tr>
+      <tr><td class="c">procs --tree</td><td class="d">process tree</td></tr>
+      <tr><td class="c">procs --sortd cpu</td><td class="d">desc by CPU</td></tr>
+      <tr><td class="c">procs --watch</td><td class="d">live refresh</td></tr>
+    </table>
+  </div>
+
+  <div class="box">
+    <h2>hyperfine <span class="rep">— time</span></h2>
+    <table>
+      <tr><td class="c">hyperfine 'a' 'b'</td><td class="d">compare two commands</td></tr>
+      <tr><td class="c">--warmup 3</td><td class="d">warmup runs</td></tr>
+      <tr><td class="c">-L n 1,4,8 'mk -j{n}'</td><td class="d">parameter sweep</td></tr>
+    </table>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════ PAGE 2 ══════════════════ -->
+<div class="page">
+<h1>Modern CLI Tools — Cheatsheet <span style="font-size:8pt;font-weight:400;color:#666">(2/2)</span></h1>
+
+<div class="cols">
+
+  <div class="box">
+    <h2>jq <span class="rep">— JSON</span></h2>
+    <table>
+      <tr><td class="c">jq . f.json</td><td class="d">pretty-print</td></tr>
+      <tr><td class="c">jq -r '.a[].name'</td><td class="d">raw output, no quotes</td></tr>
+      <tr><td class="c">jq -c '.[]'</td><td class="d">one object per line</td></tr>
+      <tr><td class="c">'.[] | select(.n&gt;3)'</td><td class="d">filter</td></tr>
+      <tr><td class="c">'map({id, name})'</td><td class="d">reshape array</td></tr>
+      <tr><td class="c">jq -s 'add' a b</td><td class="d">slurp &amp; merge files</td></tr>
+      <tr><td class="c">--arg k "$V" '.[$k]'</td><td class="d">safe var injection</td></tr>
+      <tr><td class="c">jq 'keys'</td><td class="d">object keys</td></tr>
+      <tr><td class="c">jq 'to_entries[]'</td><td class="d">k/v pairs</td></tr>
+    </table>
+    <div class="note">jless = interactive JSON pager for exploring.</div>
+  </div>
+
+  <div class="box">
+    <h2>delta <span class="rep">— git pager</span></h2>
+    <table>
+      <tr><td class="c">git diff</td><td class="d">via core.pager</td></tr>
+      <tr><td class="c">delta a.py b.py</td><td class="d">standalone diff</td></tr>
+      <tr><td class="c">-c delta.side-by-side=true</td><td class="d">force split view</td></tr>
+    </table>
+    <div class="keys" style="margin-top:1mm">
+      With <b>navigate=true</b>: <b>n</b> / <b>N</b> jump between files
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>sd <span class="rep">— sed s///</span></h2>
+    <table>
+      <tr><td class="c">sd 'old' 'new' f</td><td class="d">in-place replace</td></tr>
+      <tr><td class="c">sd -p 'a' 'b' f</td><td class="d">preview, no write</td></tr>
+      <tr><td class="c">sd -s 'a.b' 'x' f</td><td class="d">literal, no regex</td></tr>
+      <tr><td class="c">fd -e md -x sd a b</td><td class="d">bulk across files</td></tr>
+    </table>
+    <div class="note">Substitution only — sed still owns the rest.</div>
+  </div>
+
+  <div class="box">
+    <h2>xh <span class="rep">— curl / httpie</span></h2>
+    <table>
+      <tr><td class="c">xh url</td><td class="d">GET</td></tr>
+      <tr><td class="c">xh POST url a=b</td><td class="d">JSON string field</td></tr>
+      <tr><td class="c">xh POST url n:=30</td><td class="d">raw JSON type</td></tr>
+      <tr><td class="c">xh url q==linux</td><td class="d">query param</td></tr>
+      <tr><td class="c">xh url X-Tok:abc</td><td class="d">header</td></tr>
+      <tr><td class="c">xh --download url</td><td class="d">save to file</td></tr>
+      <tr><td class="c">xh -v POST url</td><td class="d">show request too</td></tr>
+    </table>
+    <div class="note">Keep curl for scripts &amp; images.</div>
+  </div>
+
+  <div class="box">
+    <h2>yazi <span class="rep">— mc / ranger</span></h2>
+    <div class="keys">
+      <b>h j k l</b> navigate · <b>Space</b> select · <b>v</b> visual select<br>
+      <b>y</b> copy · <b>x</b> cut · <b>p</b> paste · <b>d</b> delete<br>
+      <b>a</b> create · <b>r</b> rename · <b>.</b> toggle hidden<br>
+      <b>/</b> search · <b>F</b> filter · <b>Tab</b> preview<br>
+      <b>Enter</b> open · <b>q</b> quit+cd · <b>Q</b> quit no-cd
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>lazygit <span class="rep">— git TUI</span></h2>
+    <div class="keys">
+      <b>Space</b> stage/unstage · <b>a</b> stage all · <b>Enter</b> stage hunks<br>
+      <b>c</b> commit · <b>A</b> amend · <b>P</b> push · <b>p</b> pull<br>
+      <b>b</b> branches · <b>s</b> stash · <b>x</b> menu · <b>?</b> help<br>
+      <b>1–5</b> switch panels · <b>Esc</b> back · <b>q</b> quit
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>atuin <span class="rep">— shell history</span></h2>
+    <table>
+      <tr><td class="c">Ctrl-R</td><td class="d">search history</td></tr>
+      <tr><td class="c">atuin stats</td><td class="d">usage stats</td></tr>
+      <tr><td class="c">atuin import auto</td><td class="d">one-time migration</td></tr>
+    </table>
+    <div class="note">Conflicts with fzf Ctrl-R — pick one.</div>
+  </div>
+
+  <div class="box">
+    <h2>tldr <span class="rep">— man</span></h2>
+    <table>
+      <tr><td class="c">tldr tar</td><td class="d">practical examples</td></tr>
+      <tr><td class="c">tldr --update</td><td class="d">refresh cache</td></tr>
+    </table>
+  </div>
+
+  <div class="box warn">
+    <h2>Category verdicts</h2>
+    <table>
+      <tr><td class="c">exa</td><td class="d">dead → eza</td></tr>
+      <tr><td class="c">lsd</td><td class="d">redundant with eza</td></tr>
+      <tr><td class="c">gojq</td><td class="d">only for bigint / YAML</td></tr>
+      <tr><td class="c">micro</td><td class="d">use it; nano = fallback</td></tr>
+      <tr><td class="c">dust ≠ ncdu</td><td class="d">gdu is the ncdu swap</td></tr>
+      <tr><td class="c">duf ≠ du</td><td class="d">duf replaces <b>df</b></td></tr>
+      <tr><td class="c">fish</td><td class="d">non-POSIX → use zsh</td></tr>
+      <tr><td class="c">oh-my-zsh</td><td class="d">heavy → 2 source lines</td></tr>
+      <tr><td class="c">ugrep</td><td class="d">pick over rg for grep flags</td></tr>
+    </table>
+  </div>
+
+  <div class="box">
+    <h2>Install priority</h2>
+    <div class="tier">
+      <b>1.</b> zsh + 2 plugins · rg · fzf · fd<br>
+      <b>2.</b> zoxide · bat · eza · delta · starship<br>
+      <b>3.</b> btop · gdu · duf · procs · atuin · tldr · lazygit<br>
+      <b>4.</b> yazi · xh · dust · sd · micro · hyperfine
+    </div>
+    <div class="note">Additive tools (fzf, zoxide, atuin, delta, btop, hyperfine, lazygit) have no coreutils equivalent — nothing to un-learn. Insurance for future remote work: keep <code>grep -rn</code>, <code>find -name -type</code>, <code>du -sh</code>, <code>ps aux</code>.</div>
+  </div>
+
+  <div class="box">
+    <h2>Combos worth memorizing</h2>
+    <div class="keys" style="line-height:1.5">
+      <code>rg -l pat | xargs sd a b</code><br>
+      <i>bulk edit every match</i><br>
+      <code>fd -tf | fzf --preview 'bat {}'</code><br>
+      <i>pick a file visually</i><br>
+      <code>git branch | fzf | xargs git switch</code><br>
+      <i>fuzzy branch switch</i><br>
+      <code>curl -s $U | jq -r '.data[].id'</code><br>
+      <i>extract IDs from an API</i><br>
+      <code>rg --files | rg conf</code><br>
+      <i>find by path fragment</i><br>
+      <code>fd -e log -x gzip</code><br>
+      <i>batch-process matches</i>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>Init load order</h2>
+    <table>
+      <tr><td class="c">0. compinit</td><td class="d">zsh, before plugins</td></tr>
+      <tr><td class="c">1. fzf --bash/--zsh</td><td class="d"></td></tr>
+      <tr><td class="c">2. zoxide init</td><td class="d">after cd aliases</td></tr>
+      <tr><td class="c">3. atuin init</td><td class="d">after fzf (Ctrl-R)</td></tr>
+      <tr><td class="c">4. starship init</td><td class="d"></td></tr>
+      <tr><td class="c">5. syntax-highlighting</td><td class="d">absolute last (zsh)</td></tr>
+    </table>
+    <div class="note">Shared aliases in ~/.shell_common; only init lines in each rc.</div>
+  </div>
+
+  <div class="box">
+    <h2>zsh on WSL</h2>
+    <table>
+      <tr><td class="c">apt install zsh</td><td class="d">install</td></tr>
+      <tr><td class="c">chsh -s $(which zsh)</td><td class="d">default shell</td></tr>
+      <tr><td class="c">wsl --shutdown</td><td class="d">PowerShell, to apply</td></tr>
+      <tr><td class="c">wsl.exe ~ -e zsh</td><td class="d">Terminal profile fallback</td></tr>
+    </table>
+    <div class="note">Skip oh-my-zsh: 2 source lines (autosuggestions + syntax-highlighting) replace it.</div>
+  </div>
+
+  <div class="box warn">
+    <h2>WSL gotchas</h2>
+    <div class="keys">
+      <b>/mnt/c</b> is slow — keep repos in <b>~/</b>, never scan it with rg/fd/gdu<br>
+      Nerd Font is set in the <b>Windows Terminal</b> profile, not in WSL<br>
+      Slow tab-completion → <b>appendWindowsPath=false</b> in /etc/wsl.conf<br>
+      Any /etc/wsl.conf change needs <b>wsl --shutdown</b>
+    </div>
+  </div>
+
+</div>
+</div>
+
+</body>
+</html>

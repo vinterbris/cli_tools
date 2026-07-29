@@ -1,0 +1,285 @@
+# shellcheck shell=bash
+# ─────────────────────────────────────────────────────────────
+#  shell_common — shared aliases, exports, functions (bash + zsh)
+#  Install: ln -sf <repo>/dotfiles/shell_common ~/.shell_common
+#  Sourced from ~/.bashrc and ~/.zshrc. See dotfiles/README.md
+#
+#  Design rule: new names for new tools; core commands keep core
+#  behaviour. Exceptions are safe ones only —
+#    rm -I   same binary, added flag
+#    df→duf  read-only
+#    grep→ug flag-compatible with GNU grep
+# ─────────────────────────────────────────────────────────────
+
+# --- PATH -------------------------------------------------------
+# Hardcoded: `$(brew --prefix)` forks a process on every shell start.
+for _b in /home/linuxbrew/.linuxbrew "$HOME/.linuxbrew"; do
+  [ -d "$_b/bin" ] && { PATH="$_b/bin:$_b/sbin:$PATH"; HOMEBREW_PREFIX="$_b"; break; }
+done
+unset _b
+[ -n "$HOMEBREW_PREFIX" ] && export HOMEBREW_PREFIX
+# cargo install → ~/.cargo/bin ; pip --user / pipx → ~/.local/bin
+# atuin's own installer uses ~/.atuin/bin
+[ -d "$HOME/.atuin/bin" ] && PATH="$HOME/.atuin/bin:$PATH"
+[ -d "$HOME/.cargo/bin" ] && PATH="$HOME/.cargo/bin:$PATH"
+[ -d "$HOME/.local/bin" ] && PATH="$HOME/.local/bin:$PATH"
+export PATH
+
+# --- Debian/Ubuntu binary name fixes ----------------------------
+# Ubuntu ships fd as `fdfind` and bat as `batcat`.
+#
+# Resolve the REAL paths first. Aliases are invisible to anything that
+# shells out — fzf runs FZF_DEFAULT_COMMAND through `sh`, so an aliased
+# `fd` there yields an empty list and a broken preview. The `case /*`
+# test rejects alias definitions, which keeps this idempotent on re-source.
+FD_BIN='' BAT_BIN=''
+for _c in fd fdfind; do
+  _p=$(command -v "$_c" 2>/dev/null)
+  case "$_p" in /*) FD_BIN="$_p"; break ;; esac
+done
+for _c in bat batcat; do
+  _p=$(command -v "$_c" 2>/dev/null)
+  case "$_p" in /*) BAT_BIN="$_p"; break ;; esac
+done
+unset _c _p
+export FD_BIN BAT_BIN
+
+[ -n "$BAT_BIN" ] && [ "${BAT_BIN##*/}" = batcat ] && alias bat='batcat'
+[ -n "$FD_BIN"  ] && [ "${FD_BIN##*/}"  = fdfind ] && alias fd='fdfind'
+
+# --- inherited from Ubuntu's stock .bashrc ----------------------
+# Two forks at startup, ~5ms each. Kept deliberately:
+#   dircolors — LS_COLORS is consumed by zsh completion colouring
+#   lesspipe  — makes `less` read archives, .deb, images
+[ -x /usr/bin/dircolors ] && {
+  if [ -r ~/.dircolors ]; then eval "$(dircolors -b ~/.dircolors)"
+  else eval "$(dircolors -b)"; fi
+}
+[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+
+# --- ls / eza ---------------------------------------------------
+if command -v eza >/dev/null; then
+  EZA_BASE='--group-directories-first --icons=auto'
+  alias ls="eza $EZA_BASE"
+  alias ll="eza -lh --git $EZA_BASE"
+  alias la="eza -lah --git $EZA_BASE"
+  alias lt="eza --tree --level=2 $EZA_BASE"
+  alias ltt="eza --tree --level=4 $EZA_BASE"
+  alias ltg="eza --tree --level=3 --git-ignore $EZA_BASE"   # skips ignored files
+  alias lsize='eza -lah --icons=auto --sort=size --reverse'
+  alias lnew='eza -lah --icons=auto --sort=modified --reverse'
+else
+  alias ll='ls --color=auto -lhH --group-directories-first --time-style=long-iso'
+  alias la='ll -a'
+fi
+
+# --- cat / bat --------------------------------------------------
+# `cat` stays `cat`. `b` reads, `bp` is plain (safe to copy from).
+if command -v bat >/dev/null || command -v batcat >/dev/null; then
+  alias b='bat'
+  alias bp='bat -p'
+  export BAT_THEME="${BAT_THEME:-ansi}"          # follow terminal colours
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+  export MANROFFOPT='-c'
+fi
+
+# --- search -----------------------------------------------------
+# rg keeps its own name. ug IS GNU-grep-flag-compatible, so aliasing
+# is safe. No-op until ugrep is installed. Bypass with \grep.
+if command -v ug >/dev/null; then
+  alias grep='ug --color=auto'
+else
+  alias grep='grep --color=auto'      # stock Ubuntu behaviour
+  alias egrep='grep -E --color=auto'
+  alias fgrep='grep -F --color=auto'
+fi
+alias rgh='rg -uuu'                              # everything: no ignore, hidden, binary
+alias rgf='rg --files'                           # list files rg would search
+
+# --- find -------------------------------------------------------
+alias ff='fd -tf'                                # files only
+alias fdd='fd -td'                               # dirs only
+alias fda='fd -HI'                               # hidden + gitignored
+
+# --- disk -------------------------------------------------------
+command -v duf  >/dev/null && alias df='duf'     # read-only, safe to override
+command -v gdu  >/dev/null && alias ncdu='gdu'
+command -v dust >/dev/null && alias dsz='dust -d 2'
+alias dus='du -sh * 2>/dev/null | sort -h'       # coreutils fallback
+
+# --- process / system -------------------------------------------
+command -v btop  >/dev/null && alias top='btop'
+command -v procs >/dev/null && alias pg='procs'  # "process grep"
+alias ptree='procs --tree'
+alias pcpu='procs --sortd cpu'
+alias pmem='procs --sortd mem'
+
+# --- git --------------------------------------------------------
+# NOTE: `gl` here is log, NOT `git pull` (oh-my-zsh meaning). `git pull`
+# is deliberately unaliased — you want to see what it does.
+alias gs='git status -sb'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias gl='git log --oneline --graph --decorate -20'
+alias ga='git add'
+alias gc='git commit'
+alias gcm='git commit -m'
+alias gco='git switch'                           # `switch`, not `checkout`
+alias gcb='git switch -c'
+alias gp='git push'
+command -v lazygit >/dev/null && alias lg='lazygit'
+
+# --- json / http ------------------------------------------------
+alias jqc='jq -c'
+alias jqr='jq -r'
+command -v xh >/dev/null && alias http='xh'
+
+# --- package manager (apt) --------------------------------------
+if command -v apt >/dev/null; then
+  alias aptup='sudo apt update && sudo apt upgrade'
+  alias aptupd='sudo apt update'
+  alias aptupg='sudo apt upgrade'
+  alias aptin='sudo apt install'
+  alias aptrm='sudo apt remove'
+fi
+
+# --- file safety ------------------------------------------------
+# rm -I prompts ONCE for >3 files or -r. No habituation, unlike -i.
+# NOTE: aliases do not expand under `sudo` or inside scripts.
+alias rm='rm -I'
+alias mv='mv -i'
+alias cp='cp -i'
+alias ln='ln -i'
+# Recoverable delete, opt-in under its own name (freedesktop trash).
+# Caveat: cross-filesystem = full copy; outside $HOME needs .Trash-$UID.
+if command -v trash-put >/dev/null; then
+  alias tp='trash-put'
+  alias tl='trash-list'
+  alias tre='trash-restore'
+  alias tempty='trash-empty'
+fi
+
+# --- misc -------------------------------------------------------
+alias md='mkdir -pv'                             # `mkdir` keeps core behaviour
+command -v tldr >/dev/null && alias h='tldr'
+command -v yazi >/dev/null && alias fm='yazi'
+alias py='python3'                               # no hardcoded path: venv/uv-safe
+alias path='echo "$PATH" | tr ":" "\n"'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+
+# --- fzf environment (keybindings live in the rc files) ----------
+# NOTE: these run through `sh` — use $FD_BIN / $BAT_BIN, never the aliases.
+if command -v fzf >/dev/null; then
+  export FZF_DEFAULT_OPTS='--height 60% --layout=reverse --border --info=inline'
+  if [ -n "$FD_BIN" ]; then
+    export FZF_DEFAULT_COMMAND="$FD_BIN -tf -HI --exclude .git"
+    export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+    export FZF_ALT_C_COMMAND="$FD_BIN -td -H --exclude .git"
+  fi
+  [ -n "$BAT_BIN" ] && \
+    export FZF_CTRL_T_OPTS="--preview '$BAT_BIN --color=always --line-range :200 {}'"
+  command -v eza >/dev/null && \
+    export FZF_ALT_C_OPTS="--preview 'eza --tree --level=2 --icons=auto --color=always {}'"
+fi
+
+export EDITOR="${EDITOR:-micro}"
+export VISUAL="$EDITOR"
+
+# ─────────────────────────────────────────────────────────────
+#  Functions  (bash/zsh only — process substitution is not POSIX)
+# ─────────────────────────────────────────────────────────────
+
+# fuzzy-open a file in $EDITOR with preview
+fe() {
+  local f preview
+  preview='cat {}'
+  [ -n "$BAT_BIN" ] && preview="$BAT_BIN --color=always {}"
+  if [ -n "$FD_BIN" ]; then
+    f=$("$FD_BIN" -tf -HI --exclude .git | fzf --preview "$preview")
+  else
+    f=$(find . -type f -not -path '*/.git/*' | fzf --preview "$preview")
+  fi
+  [ -n "$f" ] && "${EDITOR:-vim}" "$f"
+}
+
+# search file contents, preview match, open at line
+#
+# --color=never is deliberate: rg embeds ANSI escapes INSIDE the colon-
+# delimited fields, so a coloured line yields a filename full of escape
+# bytes that no editor can open. Losing colour in the list is the price;
+# the preview pane is still highlighted.
+fif() {
+  [ -n "${1:-}" ] || { echo "usage: fif <pattern>" >&2; return 2; }
+  local sel file line preview
+  preview='cat {1}'
+  [ -n "$BAT_BIN" ] && preview="$BAT_BIN --color=always --highlight-line {2} {1}"
+  sel=$(rg --line-number --no-heading --color=never "$1" \
+        | fzf --delimiter=: --preview "$preview" --preview-window='+{2}/2') || return
+  [ -n "$sel" ] || return
+  file=${sel%%:*}
+  line=${sel#*:}; line=${line%%:*}
+  "${EDITOR:-vim}" "+$line" "$file"
+}
+
+# kill a process picked interactively
+fkill() {
+  local pids
+  if command -v procs >/dev/null; then
+    pids=$(procs --no-header | fzf -m | awk '{print $1}')
+  else
+    pids=$(ps -eo pid,user,%cpu,%mem,comm --sort=-%cpu | fzf -m --header-lines=1 | awk '{print $1}')
+  fi
+  [ -n "$pids" ] || return
+  printf '%s\n' "$pids" | xargs -r kill -"${1:-15}"
+}
+
+# Locate the docs directory by following the ~/.shell_common symlink back
+# to the repo. Override with CLI_DOCS if the layout differs.
+_cli_docs() {
+  if [ -n "${CLI_DOCS:-}" ]; then printf '%s' "$CLI_DOCS"; return; fi
+  local sc
+  sc=$(readlink -f "$HOME/.shell_common" 2>/dev/null) || return 1
+  printf '%s' "$(dirname "$(dirname "$sc")")"
+}
+
+# cs [term] — fuzzy-search cheatsheet.md by section, print the match.
+# `cs -l` lists sections without the picker.
+cs() {
+  local dir doc idx sel start rest end
+  dir=$(_cli_docs) || { echo "cs: cannot locate docs (set CLI_DOCS)" >&2; return 1; }
+  doc="$dir/cheatsheet.md"
+  [ -f "$doc" ] || { echo "cs: not found: $doc" >&2; return 1; }
+
+  idx=$(awk '
+    /^#{2,3} / { if (s) print s":"NR-1":"t; s=NR; t=$0; sub(/^#+ /,"",t) }
+    END        { if (s) print s":"NR":"t }
+  ' "$doc")
+
+  if [ "${1:-}" = "-l" ]; then
+    printf '%s\n' "$idx" | cut -d: -f3-
+    return
+  fi
+
+  sel=$(printf '%s\n' "$idx" | fzf \
+          --delimiter=: --with-nth=3.. \
+          --query="${1:-}" --select-1 \
+          --preview "sed -n {1},{2}p '$doc'" \
+          --preview-window='right:65%:wrap') || return
+
+  start=${sel%%:*}; rest=${sel#*:}; end=${rest%%:*}
+  if [ -n "$BAT_BIN" ]; then
+    sed -n "${start},${end}p" "$doc" | "$BAT_BIN" -l md -p --color=always
+  else
+    sed -n "${start},${end}p" "$doc"
+  fi
+}
+
+# git: fuzzy switch branch
+fbr() {
+  local br
+  br=$(git branch -a --format='%(refname:short)' \
+       | fzf --preview 'git log --oneline --color=always -20 {}') || return
+  [ -n "$br" ] && git switch "${br#remotes/origin/}"
+}
