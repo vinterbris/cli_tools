@@ -192,11 +192,18 @@ if (Get-CliBin yazi) { Set-Alias fm yazi -Force }
 
 function path { $env:PATH -split ';' | Where-Object { $_ } }
 
-# Set-Item on the Function: drive, not `function ..` — the latter's parsing
-# with a dot-only name is not something to bet a profile load on.
-Set-Item -Path 'Function:..'   -Value { Set-Location .. }
-Set-Item -Path 'Function:...'  -Value { Set-Location ../.. }
-Set-Item -Path 'Function:....' -Value { Set-Location ../../.. }
+# Plain `function ..`, and this is the second attempt.
+#
+# The first version used `Set-Item -Path 'Function:..'` on the theory that a
+# dot-only function name might not parse. It was the opposite: `function ..`
+# parses fine, and Set-Item is the one that fails — it resolves `Function:..`
+# as a *relative path* inside the Function: drive, which yields a null name:
+#   "Cannot process argument because the value of argument name is null"
+# The defensive choice was the broken one. `-LiteralPath` would likely also
+# work, but there is no reason to prefer it over the plain declaration.
+function ..   { Set-Location .. }
+function ...  { Set-Location ../.. }
+function .... { Set-Location ../../.. }
 
 # ─────────────────────────────────────────────────────────────
 #  cs — fuzzy-search cheatsheet.md by section

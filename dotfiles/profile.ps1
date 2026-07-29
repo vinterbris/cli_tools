@@ -19,6 +19,17 @@
 #  full Linux→PowerShell portability audit.
 # ─────────────────────────────────────────────────────────────
 
+# --- startup timing ---------------------------------------------
+# Set CLI_TOOLS_TIMING=1 to print cumulative milliseconds at each stage.
+# Exists because "the profile feels slow" is not actionable and guessing at
+# the cause is how you optimise the wrong line. Costs one Stopwatch when
+# off, and Mark is a no-op.
+$CliSw = if ($env:CLI_TOOLS_TIMING) { [System.Diagnostics.Stopwatch]::StartNew() } else { $null }
+function Mark {
+    param([string]$Label)
+    if ($CliSw) { Write-Host ('{0,6} ms  {1}' -f $CliSw.ElapsedMilliseconds, $Label) -ForegroundColor DarkGray }
+}
+
 # --- locate the repo --------------------------------------------
 # $PSScriptRoot is <repo>\dotfiles. Nothing is hardcoded, so the repo can
 # be cloned anywhere. CLI_DOCS is the same override name shell_common uses.
@@ -48,6 +59,7 @@ $FzfBin      = Get-CliBin fzf
 $EzaBin      = Get-CliBin eza
 $StarshipBin = Get-CliBin starship
 $ZoxideBin   = Get-CliBin zoxide
+Mark 'resolve binaries'
 
 # --- editor -----------------------------------------------------
 # micro, same as the Linux config: modern keybindings (Ctrl+S saves,
@@ -114,8 +126,11 @@ if ($FzfBin) {
     }
 }
 
+Mark 'fzf env'
+
 # --- the alias / function layer ---------------------------------
 . (Join-Path $PSScriptRoot 'functions.ps1')
+Mark 'functions.ps1'
 
 # --- PSReadLine -------------------------------------------------
 # Parity with zsh-autosuggestions (inline prediction) and
@@ -142,6 +157,7 @@ if (Get-Module PSReadLine) {
     Set-PSReadLineKeyHandler -Key UpArrow   -Function HistorySearchBackward
     Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
 }
+Mark 'PSReadLine'
 
 # --- prompt: starship, Pure preset ------------------------------
 # Same starship.toml as WSL — one file, no Windows fork. STARSHIP_CONFIG is
@@ -154,6 +170,7 @@ if ($StarshipBin) {
     $env:STARSHIP_CONFIG = Join-Path $PSScriptRoot 'starship.toml'
     Invoke-Expression (& $StarshipBin init powershell)
 }
+Mark 'starship init'
 
 # --- zoxide -----------------------------------------------------
 # Provides `z` and `zi`. Must come after the prompt init: zoxide hooks the
@@ -161,6 +178,7 @@ if ($StarshipBin) {
 if ($ZoxideBin) {
     Invoke-Expression (& { (& $ZoxideBin init powershell | Out-String) })
 }
+Mark 'zoxide init'
 
 # --- PSFzf: Ctrl+T / Ctrl+R / Alt+C ------------------------------
 # Alt+C is bound by default. Ctrl+R is NOT — PSFzf refuses to take it from
@@ -190,8 +208,11 @@ if ($FzfBin) {
 # Loaded LAST so it can override anything above. This is the opposite of
 # the zsh order, where .zshrc.local must precede syntax highlighting;
 # PSReadLine colours are applied dynamically, so no such constraint exists.
+Mark 'PSFzf'
+
 $localProfile = Join-Path $PSScriptRoot 'profile.local.ps1'
 if (Test-Path $localProfile) { . $localProfile }
+Mark 'total'
 
 # --- self-check --------------------------------------------------
 # Structural control, not a reminder: a function silently loses to an alias

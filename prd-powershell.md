@@ -217,8 +217,16 @@ here is a review-level claim, not a tested one.
   (junegunn/fzf#1018, #2638) `[WEB]` — and on the quoting surviving PowerShell →
   fzf → cmd. If the preview pane shows an error, the file-only fallback is in a
   comment beside it.
-- **`Set-Item -Path 'Function:..'`.** Chosen over `function ..` precisely because the
-  latter's parsing is not worth betting a profile load on. `[INF]`
+- ~~`Set-Item -Path 'Function:..'`~~ **— this was the bug, and it was caused by the
+  defensive choice.** `Set-Item` resolves `Function:..` as a *relative path* inside the
+  Function: drive and derives a null name: *"Cannot process argument because the value
+  of argument name is null"*. Thrown on the first real shell start. `function ..`
+  parses fine and is now used. `[RUN]`
+
+  Worth keeping as a pattern: the reasoning was "a dot-only function name might not
+  parse, so use the provider API instead". The speculative risk was imaginary and the
+  mitigation was the actual defect. When a plain declaration is the idiom everyone
+  uses, that is evidence; a hypothesis about the parser is not.
 - **`Add-Type -AssemblyName Microsoft.VisualBasic` under PowerShell 7.** Used by `tp`.
   `[MEM]` If it is unavailable, `tp` reports and deletes nothing.
 - **`tl`'s `GetDetailsOf` column indices** (1 = original path, 2 = date deleted).
@@ -246,8 +254,14 @@ here is a review-level claim, not a tested one.
   Confirmed by the run: `$env:SCOOP` is **unset** on this machine, so the
   `$HOME\scoop` fallback is the path that actually gets used — worth knowing before
   anyone "simplifies" it away. `[RUN]`
-- **Startup time under 400 ms** with starship + zoxide + PSFzf + PSReadLine
-  prediction. `[?]` Success criterion 1, unmeasured.
+- 🔴 **Startup time: 1759 ms measured on the first real load** `[RUN]` — 4.4× the
+  400 ms target in success criterion 1. Not yet diagnosed. Part of it is first-run JIT
+  and Scoop shims resolving cold, so a warm figure is needed before anything is
+  optimised. `CLI_TOOLS_TIMING=1` now prints cumulative milliseconds per stage
+  (binaries → fzf env → functions → PSReadLine → starship → zoxide → PSFzf) so the
+  cost can be attributed instead of guessed at. Likely suspects, in order and
+  unconfirmed: `Import-Module PSFzf`, `Import-Module PSReadLine`, the two
+  `Invoke-Expression` init calls, and six `Get-Command` probes. `[INF]`
 - ~~Windows Terminal font.~~ Resolved: `Maple-Mono-NF` is installed. `[RUN]` Only thing
   left is that Windows Terminal is actually configured to use it.
 
