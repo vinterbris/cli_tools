@@ -106,28 +106,33 @@ $Tools = [ordered]@{
 }
 
 if (-not $SkipTools) {
+    # Scoop's own state is read from its directory layout, not from parsing
+    # `scoop list` / `scoop bucket list`.
+    #
+    # WHY: the first version of this script parsed that output, and the dry
+    # run proved it does not work — `scoop list` prints its "Installed apps:"
+    # header through the host stream and the table through the output stream,
+    # so a text match silently found nothing and every tool was reported as
+    # "would install". A check that fails by saying "no" is worse than no
+    # check. The apps/ and buckets/ directories are what Scoop actually
+    # keys on, and Test-Path cannot half-succeed.
+    $ScoopRoot = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $HOME 'scoop' }
+    Ok "scoop root: $ScoopRoot"
+
     Step "Scoop buckets"
-    # Scoop's output shape is not a stable interface — depending on version it
-    # emits objects or plain text. Under Set-StrictMode, reading .Name off a
-    # string throws, so match the flattened text instead of trusting a schema.
-    $known = (& scoop bucket list | Out-String)
     foreach ($b in $Buckets) {
-        if ($known -match "(?m)^\s*$([regex]::Escape($b))\b") { Ok "$b already added"; continue }
+        if (Test-Path (Join-Path $ScoopRoot "buckets\$b")) { Ok "$b already added"; continue }
         if ($DryRun) { Act "scoop bucket add $b"; continue }
         try { & scoop bucket add $b | Out-Null; Ok "added $b" }
         catch { Warn "bucket $b failed: $($_.Exception.Message)"; $script:Failures.Add("bucket:$b") }
     }
 
     Step "Tools"
-    # No pre-flight `scoop search` parsing: the output format is not a stable
-    # interface. Attempting the install and recording the failure is both
+    # No pre-flight `scoop search` either: whether a manifest exists at all is
+    # settled by attempting the install and recording the failure, which is
     # simpler and authoritative.
-    # Queried even under -DryRun: `scoop list` is read-only, and a dry run
-    # that cannot tell "would install" from "already there" is not much of a
-    # preview.
-    $installed = (& scoop list 2>$null | Out-String)
     foreach ($t in $Tools.Keys) {
-        if ($installed -match "(?m)^\s*$([regex]::Escape($t))\s") { Ok "$t already installed"; continue }
+        if (Test-Path (Join-Path $ScoopRoot "apps\$t")) { Ok "$t already installed"; continue }
         if ($DryRun) { Act "scoop install $t   ($($Tools[$t]))"; continue }
         try { & scoop install $t | Out-Null; Ok "installed $t" }
         catch { Warn "$t failed: $($_.Exception.Message)"; $script:Failures.Add("tool:$t") }
