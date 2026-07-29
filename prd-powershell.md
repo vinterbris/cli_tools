@@ -254,14 +254,26 @@ here is a review-level claim, not a tested one.
   Confirmed by the run: `$env:SCOOP` is **unset** on this machine, so the
   `$HOME\scoop` fallback is the path that actually gets used — worth knowing before
   anyone "simplifies" it away. `[RUN]`
-- 🔴 **Startup time: 1759 ms measured on the first real load** `[RUN]` — 4.4× the
-  400 ms target in success criterion 1. Not yet diagnosed. Part of it is first-run JIT
-  and Scoop shims resolving cold, so a warm figure is needed before anything is
-  optimised. `CLI_TOOLS_TIMING=1` now prints cumulative milliseconds per stage
-  (binaries → fzf env → functions → PSReadLine → starship → zoxide → PSFzf) so the
-  cost can be attributed instead of guessed at. Likely suspects, in order and
-  unconfirmed: `Import-Module PSFzf`, `Import-Module PSReadLine`, the two
-  `Invoke-Expression` init calls, and six `Get-Command` probes. `[INF]`
+- 🟡 **Startup: 460 ms inside the profile, warm** `[RUN]`. First cold load was 1759 ms;
+  most of that was JIT and cold Scoop shims, not the config. Attributed, not guessed:
+
+  | Stage | Cumulative | Own cost |
+  |---|---|---|
+  | resolve binaries | 66 ms | 66 — six `Get-Command -CommandType Application` PATH scans |
+  | fzf env | 72 ms | 6 |
+  | `functions.ps1` | 102 ms | 30 |
+  | PSReadLine | 183 ms | 81 — the module load itself, which pwsh would do anyway |
+  | starship init | 285 ms | 102 — spawns `starship.exe`, then `Invoke-Expression` |
+  | zoxide init | 329 ms | 44 — spawns `zoxide.exe` |
+  | PSFzf | 458 ms | 129 — `Import-Module PSFzf` |
+  | total | 460 ms | |
+
+  The 400 ms figure in success criterion 1 was invented without a baseline and refers
+  to total shell start, which is larger than this. Whether 460 ms is a problem is a
+  judgement call, not a fact: the honest statement is that ~250 ms of it (starship +
+  zoxide + binary probes) is cacheable, and the rest is module loading that is hard to
+  avoid without deferring key-handler registration. **No optimisation attempted** —
+  a cache layer is real machinery and needs to be worth it first.
 - ~~Windows Terminal font.~~ Resolved: `Maple-Mono-NF` is installed. `[RUN]` Only thing
   left is that Windows Terminal is actually configured to use it.
 
@@ -306,4 +318,7 @@ Windows-side re-quoting. That still needs a live `Ctrl+T`.
 | 🔴 | **Not pushed.** No credentials in the agent's sandbox. Remote must be added and pushed by hand |
 | 🔴 | **WSL copy is still a `cp -r`**, not a clone. The drift problem is not yet solved, only made solvable |
 | 🔴 | **No PowerShell code has been run** |
-| 🔴 | `bootstrap/INSTALL.md` has no Windows section yet; `cheatsheet.md` has no PowerShell column (M4 partially done) |
+| ✅ | It loads and works. `Test-CliToolsSetup` reports `cli_tools: OK` — no shadowed names, all 17 tools resolvable. `z`, `ll`, `b`, `..` confirmed working by hand `[RUN]` |
+| 🔴 | **The real blocker is now documentation, not code.** His words: "остальные хз как использовать". `e`, `cs`, `path`, `tl`, `tp`, `rgh`, `ff`, `fdd`, `pg`, `Ctrl+R`, `Alt+C` and the scoop wrappers are all installed and all unused, because nothing tells him what they do. `cheatsheet.md` has no PowerShell content and `bootstrap/INSTALL.md` has no Windows section — M4 was deferred and that deferral is what is costing him now |
+| 🔴 | **One chord fires only under the Russian keyboard layout** `[RUN]`, which is backwards from expectation and not yet diagnosed. Which chord and which direction is unconfirmed. PSReadLine registers handlers against the produced character, so layout-dependent chords are a known class of problem — but the specific case needs pinning down before it is explained |
+| 🔴 | The replace-and-backup path in `install.ps1` is still untested: `$PROFILE` did not exist, so it took the create branch |
