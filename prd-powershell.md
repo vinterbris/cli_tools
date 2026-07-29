@@ -310,8 +310,31 @@ here is a review-level claim, not a tested one.
   command deliberately kept native for pipeline reasons. Recommending it was a bad
   call; the cost was not checked before recommending. Now behind `CLI_TOOLS_ICONS=1`.
 
-  Open: starship's cached init still costs 85 ms. Either the cache is not being used or
-  dot-sourcing the generated script is itself the cost. Unresolved.
+  **Third measurement, after installing carapace and dropping Terminal-Icons: 1487 ms
+  inside the profile** `[RUN]` — worse again, and the reason is one line:
+
+  | Stage | Own cost |
+  |---|---|
+  | resolve binaries | 65 ms (down from 100 — the carapace miss is gone, as predicted) |
+  | starship init | 110 ms |
+  | zoxide init | 15 ms |
+  | **carapace** | **960 ms** |
+  | atuin | 60 ms |
+  | PSFzf | 143 ms |
+
+  🔴 **The init cache appears not to work at all.** `starship` costs 110 ms cached
+  against 102 ms uncached, and `carapace` costs 960 ms — both consistent with the
+  binary being run on every start. And it would have failed *silently*: if
+  `New-Item`/`Set-Content` threw, the old code left `$fresh` false forever and simply
+  paid full price every time, saying nothing. That is the third time in this project a
+  check has failed by quietly doing nothing.
+
+  Now: regeneration is announced under `CLI_TOOLS_TIMING`, a write failure produces a
+  warning and an explicit fallback, and `Test-CliToolsCache` reports the cache
+  directory, file sizes and per-tool freshness. Diagnosis before more optimisation.
+
+  If carapace turns out to cost ~1 s even when genuinely cached, it does not survive
+  the trade — Tab completion for 1000+ commands is not worth a second per shell.
 
   `carapace` is `carapace-bin` in the **extras** bucket, not `carapace` in `main` — the
   installed app directory is `carapace-bin`, the shim is `carapace.exe`. `[WEB]`
@@ -421,5 +444,5 @@ Windows-side re-quoting. That still needs a live `Ctrl+T`.
 | 🔴 | **No PowerShell code has been run** |
 | ✅ | It loads and works. `Test-CliToolsSetup` reports `cli_tools: OK` — no shadowed names, all 17 tools resolvable. `z`, `ll`, `b`, `..` confirmed working by hand `[RUN]` |
 | 🔴 | **The real blocker is now documentation, not code.** His words: "остальные хз как использовать". `e`, `cs`, `path`, `tl`, `tp`, `rgh`, `ff`, `fdd`, `pg`, `Ctrl+R`, `Alt+C` and the scoop wrappers are all installed and all unused, because nothing tells him what they do. `cheatsheet.md` has no PowerShell content and `bootstrap/INSTALL.md` has no Windows section — M4 was deferred and that deferral is what is costing him now |
-| 🟡 | **`Ctrl+T` misbehaved and the terminal hung; `Alt+C` was fine** `[RUN]`. Working hypothesis, not yet confirmed: `FZF_CTRL_T_COMMAND` was `fd -tf -HI`, and `Ctrl+T` in `$HOME` therefore walked `AppData` — tens of thousands of files — before fzf drew anything. Changed to drop `-I` and exclude `AppData`, `node_modules`, `.git`, `$Recycle.Bin`. Settle it by timing `fd -tf -HI` versus the new form in `$HOME` |
+| ✅ | **`Ctrl+T` freeze: diagnosed and fixed, hypothesis confirmed by measurement.** In `$HOME`, `fd -tf -HI --exclude .git` took **3305 ms**; with `-I` dropped and `AppData`/`node_modules` excluded, **235 ms** — 14× `[RUN]`. `Alt+C` was unaffected because it lists directories only, of which there are orders of magnitude fewer. The Linux config's `-HI` is fine on Linux and wrong in a Windows home directory, where `AppData` lives |
 | 🔴 | The replace-and-backup path in `install.ps1` is still untested: `$PROFILE` did not exist, so it took the create branch |

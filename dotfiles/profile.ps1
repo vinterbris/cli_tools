@@ -110,12 +110,47 @@ function Use-CachedInit {
     $fresh = (Test-Path -LiteralPath $cache) -and
              ((Get-Item -LiteralPath $cache).LastWriteTimeUtc -ge (Get-Item -LiteralPath $Exe).LastWriteTimeUtc)
     if (-not $fresh) {
-        if (-not (Test-Path -LiteralPath $CliCacheDir)) {
-            New-Item -ItemType Directory -Path $CliCacheDir -Force | Out-Null
+        # Regeneration must be LOUD. If writing the cache fails, the previous
+        # version fell back to running the binary on every single start and
+        # said nothing — a silent permanent slowdown, which is the failure
+        # class this config keeps getting caught by.
+        try {
+            if (-not (Test-Path -LiteralPath $CliCacheDir)) {
+                New-Item -ItemType Directory -Path $CliCacheDir -Force -ErrorAction Stop | Out-Null
+            }
+            $generated = (& $Exe @InitArgs | Out-String)
+            if (-not $generated.Trim()) { throw "$Exe $($InitArgs -join ' ') produced no output" }
+            Set-Content -LiteralPath $cache -Value $generated -Encoding utf8 -ErrorAction Stop
+            if ($CliSw) { Mark "  (regenerated cache: $Name)" }
+        } catch {
+            Write-Warning "cli_tools: cache for '$Name' could not be written, falling back to running the binary every start. $($_.Exception.Message)"
+            Invoke-Expression ((& $Exe @InitArgs | Out-String))
+            return
         }
-        (& $Exe @InitArgs | Out-String) | Set-Content -LiteralPath $cache -Encoding utf8
     }
     . $cache
+}
+
+# Diagnostic for the above. Answers "is the cache actually being used?"
+# rather than leaving it to inference from timing numbers.
+function Test-CliToolsCache {
+    if ($env:CLI_TOOLS_NO_CACHE) { Write-Host 'CLI_TOOLS_NO_CACHE is set — caching disabled' -ForegroundColor DarkYellow; return }
+    if (-not (Test-Path -LiteralPath $CliCacheDir)) {
+        Write-Warning "cache directory does not exist: $CliCacheDir"
+        Write-Host 'Every init is being regenerated on every shell start.' -ForegroundColor DarkYellow
+        return
+    }
+    Write-Host "cache: $CliCacheDir" -ForegroundColor DarkGray
+    foreach ($n in 'starship', 'zoxide', 'carapace', 'atuin') {
+        $f = Join-Path $CliCacheDir "$n.ps1"
+        if (-not (Test-Path -LiteralPath $f)) { Write-Host ('{0,-10} absent' -f $n) -ForegroundColor DarkYellow; continue }
+        $exe  = Get-CliBin $(if ($n -eq 'carapace') { 'carapace' } else { $n })
+        $item = Get-Item -LiteralPath $f
+        $state = if (-not $exe) { 'no binary' }
+                 elseif ($item.LastWriteTimeUtc -ge (Get-Item -LiteralPath $exe).LastWriteTimeUtc) { 'fresh' }
+                 else { 'STALE — regenerates every start' }
+        Write-Host ('{0,-10} {1,7} bytes  {2}' -f $n, $item.Length, $state)
+    }
 }
 
 function Clear-CliToolsCache {
