@@ -103,9 +103,14 @@ function Use-CachedInit {
         return
     }
 
-    $cache = Join-Path $CliCacheDir "$Name.ps1"
-    $fresh = (Test-Path -LiteralPath $cache) -and
-             ((Get-Item -LiteralPath $cache).LastWriteTimeUtc -ge (Get-Item -LiteralPath $Exe).LastWriteTimeUtc)
+    # The cache is keyed on $Name alone, so a change to $InitArgs would not
+    # invalidate it. The invocation is therefore recorded as the first line
+    # and compared: a different command line counts as stale.
+    $cache  = Join-Path $CliCacheDir "$Name.ps1"
+    $header = "# cli_tools: $Exe $($InitArgs -join ' ')"
+    $fresh  = (Test-Path -LiteralPath $cache) -and
+              ((Get-Item -LiteralPath $cache).LastWriteTimeUtc -ge (Get-Item -LiteralPath $Exe).LastWriteTimeUtc) -and
+              ((Get-Content -LiteralPath $cache -TotalCount 1) -eq $header)
 
     if (-not $fresh) {
         $generated = $null
@@ -114,7 +119,7 @@ function Use-CachedInit {
             if (-not (Test-Path -LiteralPath $CliCacheDir)) {
                 New-Item -ItemType Directory -Path $CliCacheDir -Force -ErrorAction Stop | Out-Null
             }
-            Set-Content -LiteralPath $cache -Value $generated -Encoding utf8 -ErrorAction Stop
+            Set-Content -LiteralPath $cache -Value "$header`n$generated" -Encoding utf8 -ErrorAction Stop
             Write-CliTiming "  (regenerated cache: $Name)"
         } catch {
             # A write failure must not become a permanent silent slowdown:
@@ -268,9 +273,14 @@ if ($env:CLI_TOOLS_ICONS) {
 # --- prompt: starship, Pure preset ------------------------------
 # The same starship.toml as WSL. STARSHIP_CONFIG is set explicitly rather
 # than relying on ~/.config, so the repo stays the single source of truth.
+# --print-full-init is required for caching to achieve anything. Plain
+# `starship init powershell` emits a 135-byte STUB that re-invokes starship
+# with --print-full-init at load time, so caching the stub still spawned the
+# process on every start — measured 105 ms, indistinguishable from no cache.
+# --print-full-init emits the real script, which caches usefully.
 if ($StarshipBin) {
     $env:STARSHIP_CONFIG = Join-Path $PSScriptRoot 'starship.toml'
-    Use-CachedInit -Name starship -Exe $StarshipBin -InitArgs @('init', 'powershell')
+    Use-CachedInit -Name starship -Exe $StarshipBin -InitArgs @('init', 'powershell', '--print-full-init')
 }
 Write-CliTiming 'starship init'
 

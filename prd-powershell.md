@@ -328,7 +328,23 @@ here is a review-level claim, not a tested one.
   internal state — not a per-start cost.
 
   Net: 550 ms now with four more tools than the 847 ms baseline. Remaining costs are
-  PSFzf 147 ms and starship 100 ms, both module/script loads.
+  PSFzf 147 ms and starship 100 ms.
+
+  **starship's 100 ms explained, from `Test-CliToolsCache` output rather than by
+  guessing.** Its cache file was **135 bytes**; zoxide's was 4446 `[RUN]`. 135 bytes
+  cannot cost 105 ms to dot-source — and `starship init powershell` does not emit the
+  init, it emits a small stub that re-invokes
+  `starship init powershell --print-full-init` at load time. The cache was caching the
+  stub, so the process spawned anyway, which is precisely why starship's cost looked
+  identical cached and uncached.
+
+  Fixed by caching `--print-full-init`. That also exposed a flaw in the cache itself: it
+  was keyed on `$Name` alone, so a change to `$InitArgs` would not have invalidated it.
+  The invocation is now written as the cache file's first line and compared.
+
+  Worth noting as the argument for `Test-CliToolsCache` existing: two rounds of
+  reasoning from timing numbers alone got this wrong, and one glance at a file size
+  settled it.
 
   ⚠️ **Retraction of the paragraph below.** It was written from two timing numbers and
   asserted a broken cache. Wrong, and the fourth over-inference of this kind in this
