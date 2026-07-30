@@ -44,64 +44,29 @@ $env:CLI_DOCS = Split-Path -Parent $PSScriptRoot
 # Get-CliBin and the $*Bin variables land in the session scope because this
 # file is dot-sourced; functions.ps1 depends on that. Dot-source this file,
 # do not run it as a script.
-# One PATH enumeration serves ~21 lookups across this file and functions.ps1.
+# Plain Get-Command, deliberately, after a measured detour.
 #
-# `*.exe` ONLY, and that restriction is the whole point. A first version
-# enumerated every file in every PATH directory and filtered by PATHEXT in a
-# PowerShell loop: 140 ms, worse than the 62 ms of Get-Command probes it
-# replaced. The filesystem does the filtering here instead — measured at 22 ms
-# for a single `*.exe` pattern across PATH, and roughly 22 ms per additional
-# pattern, so more extensions would cost more than they save.
+# A PATH index was built to replace ~21 of these probes and then reverted. It
+# worked — 380 ms against 386 — but the gain was ~25 ms, roughly 6%, in
+# exchange for 35 lines, its own verification function, and a correctness
+# limitation Get-Command does not have: a `.cmd` earlier on PATH would be
+# shadowed by a same-named `.exe`. Machinery must not exceed the problem, and a
+# construct needing its own test to police a limitation it introduced is on the
+# wrong side of that.
 #
-# Every tool this config resolves is a Scoop shim or a system .exe, so a
-# .exe-only index hits in practice. A MISS falls through to Get-Command, which
-# is correct but slow — and misses only happen for tools that are not
-# installed.
+# Cost of what remains, for anyone tempted to try again: ~15 ms per probe on
+# this machine, so about 60 ms here and 45 ms in functions.ps1. Known and
+# accepted, not overlooked.
 #
-# Known limitation: a `.cmd` or `.bat` earlier on PATH than a same-named
-# `.exe` would be shadowed by the index, where the real resolver would prefer
-# the `.cmd`. `Test-CliBinIndex` compares the two and reports any such case.
-#
-# No cache file, so nothing to invalidate. A tool installed mid-session is not
-# seen until the next shell, which is already true of everything here.
-$CliBinIndex = @{}   # @{} is case-insensitive, matching Windows semantics
-foreach ($dir in ($env:PATH -split ';')) {
-    $d = $dir.Trim('"')
-    if (-not $d -or -not [IO.Directory]::Exists($d)) { continue }
-    foreach ($f in [IO.Directory]::GetFiles($d, '*.exe')) {
-        $n = [IO.Path]::GetFileNameWithoutExtension($f)
-        if (-not $CliBinIndex.ContainsKey($n)) { $CliBinIndex[$n] = $f }
-    }
-}
-
 # Applications only, by design. functions.ps1 deliberately uses Get-Command
-# for `scoop`, whose entry point may be a .ps1 rather than an application.
+# without -CommandType for `scoop`, whose entry point may be a .ps1.
 function Get-CliBin {
     [OutputType([string])]
     param([Parameter(Mandatory)][string]$Name)
-    if ($CliBinIndex.ContainsKey($Name)) { return $CliBinIndex[$Name] }
     $cmd = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue |
            Select-Object -First 1
     if ($cmd) { return $cmd.Source }
     return $null
-}
-
-# Cross-check against Get-Command. Run by hand after changing anything about
-# PATH handling; not machinery in the startup path.
-function Test-CliBinIndex {
-    [CmdletBinding()]
-    param()
-    $names = 'fzf','zoxide','starship','bat','fd','rg','eza','jq','procs','dust','duf',
-             'xh','lazygit','yazi','micro','btm','tldr','carapace','gsudo','atuin',
-             'hyperfine','ouch','glow','notepad'
-    $bad = foreach ($n in $names) {
-        $a = Get-CliBin $n
-        $b = (Get-Command $n -CommandType Application -ErrorAction SilentlyContinue |
-              Select-Object -First 1).Source
-        if ($a -ne $b) { [pscustomobject]@{ Name = $n; Index = $a; GetCommand = $b } }
-    }
-    if ($bad) { Write-Warning 'index disagrees with Get-Command:'; $bad | Format-Table -AutoSize | Out-String | Write-Host }
-    else { Write-Host "index agrees with Get-Command on all $($names.Count) names" -ForegroundColor Green }
 }
 
 $FdBin       = Get-CliBin fd

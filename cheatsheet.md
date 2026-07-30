@@ -502,7 +502,6 @@ download from voidtools.
 ```powershell
 Test-CliToolsSetup         # name collisions + which tools are missing
 Test-CliToolsCache         # is the init cache actually being used
-Test-CliBinIndex           # does the PATH index agree with Get-Command
 Clear-CliToolsCache        # wipe it, then restart the shell
 
 $env:CLI_TOOLS_TIMING=1; pwsh -NoLogo -Command exit    # per-stage startup cost

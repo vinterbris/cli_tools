@@ -427,12 +427,21 @@ executables. Result: "resolve binaries" went 62 → **140 ms** and the total wen
 409 `[RUN]`. `functions.ps1` did drop 59 → 16 ms, confirming the probes were indeed its
 cost, but the index paid more than it saved.
 
-Rewritten to `*.exe` only, letting the filesystem do the filtering, with a `Get-Command`
-fallback on a miss. The trade is explicit: ~22 ms per pattern means additional extensions
-cost more than they save, and every tool here is a Scoop shim or a system `.exe`. The
-known limitation — a `.cmd` shadowing a same-named `.exe` earlier on PATH — is what
-`Test-CliBinIndex` exists to catch, and it currently agrees with `Get-Command` on all 24
-names `[RUN]`.
+Rewritten to `*.exe` only: **380 ms**, against 386 before the index existed `[RUN]`.
+
+🔴 **Then reverted.** The gain was ~25 ms — −11 ms on its own stage, −14 in
+`functions.ps1`, about 6% — in exchange for 35 lines, a `Test-CliBinIndex` function whose
+only job was policing the design, and a correctness limitation `Get-Command` does not
+have: a `.cmd` earlier on PATH shadowed by a same-named `.exe`. A construct that needs its
+own test to guard a limitation it introduced, for 6%, is on the wrong side of *machinery
+must not exceed the problem* — the rule applied to every other decision in this project.
+
+Sergey's call, and the deciding question was the right one: "I didn't understand the
+benefit of what was added."
+
+Recorded for anyone tempted to retry: ~15 ms per `Get-Command -CommandType Application`
+probe on this machine, so ~60 ms in `profile.ps1` and ~45 ms in `functions.ps1`. Known and
+accepted, not overlooked.
 | `starship prompt --continuation` spawn | **26 ms** | **Not built.** It requires regex surgery on a third-party generated script plus a new `starship.toml` mtime dependency in the freshness check. 26 ms does not buy that; the machinery/payoff rule says no |
 
 ### Ctrl+T and Alt+C removed
@@ -479,10 +488,44 @@ Where it goes, and whether it is reducible:
 | atuin | 46 | Already cached |
 | PSFzf | 143 | Only by deferring key-handler registration to the first keypress, which is real machinery for ~140 ms |
 
-**Position: stop here.** Everything cheap has been taken. What remains is module loading
-and script parsing, and the only lever left — lazy-loading PSFzf — is more mechanism than
-the problem justifies. Revisit only if the shell start becomes annoying in practice
-rather than in a table.
+**Position: stop here**, and now on a documented basis rather than on my judgement.
+
+### What the literature says, having finally looked it up
+
+Searched only after Sergey asked whether I had — I had not, and it cost time. Two primary
+sources: Microsoft's [startup troubleshooting
+guide](https://learn.microsoft.com/en-us/powershell/scripting/dev-cross-plat/performance/startup-performance)
+and Steve Lee's [Optimizing your
+$Profile](https://devblogs.microsoft.com/powershell/optimizing-your-profile/), where the
+PowerShell dev manager takes a profile from 1465 ms to 217 ms.
+
+🔴 **The headline technique does not apply to this problem, and that is the most valuable
+thing the search produced.** Steve moves interactive setup into an `Initialize-Profile`
+function called from `prompt`, on the basis that `prompt` only runs in interactive
+sessions. But his 217 ms is a measurement of `pwsh -command 1` — **non-interactive**, where
+`prompt` is never called and the deferred work never runs at all. In an interactive
+session `prompt` is invoked *before* the first prompt is drawn, so the work still happens
+before you see `❯`. He says as much: *"in a way, this is cheating."*
+
+The real benefit is faster non-interactive `pwsh -c …` for scripts and tooling. It does
+not speed up opening a terminal tab, which is the actual complaint. Without checking this,
+the obvious next move would have been to restructure the entire profile for zero perceived
+gain.
+
+Confirmed by the same sources:
+
+- `Get-Command` costs ~15.8 ms per call in his measurements — consistent with the ~15 ms
+  measured here, and the reason the probe count mattered.
+- `Get-Content -Raw` 0.81 ms versus `[IO.File]::ReadAllText` 0.19 ms — the same substitution
+  already made in the cache freshness check.
+
+Should have been used from the start: **`PSProfiler` / `Measure-Script`**, which attributes
+cost *per line*. `Write-CliTiming` is a hand-rolled substitute that resolves only to
+stage granularity, and that coarseness is precisely why three successive diagnoses of the
+starship and cache costs were wrong.
+
+Ruled out as external factors `[RUN]`: `$env:PSModulePath` contains no OneDrive or UNC
+entries, so signed-module verification over a slow path is not in play.
 
   ⚠️ **Retraction of the paragraph below.** It was written from two timing numbers and
   asserted a broken cache. Wrong, and the fourth over-inference of this kind in this
