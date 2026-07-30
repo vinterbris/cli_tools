@@ -44,47 +44,45 @@ $env:CLI_DOCS = Split-Path -Parent $PSScriptRoot
 # Get-CliBin and the $*Bin variables land in the session scope because this
 # file is dot-sourced; functions.ps1 depends on that. Dot-source this file,
 # do not run it as a script.
-# One PATH enumeration serves all ~21 lookups in this file and functions.ps1.
-# Measured: the index builds in 22 ms over 771 executables, against 62 ms for
-# eight `Get-Command -CommandType Application` probes alone — so the cost was
-# per-probe after all, not command-discovery warm-up as previously assumed.
+# One PATH enumeration serves ~21 lookups across this file and functions.ps1.
 #
-# PATH order is preserved by first-match-wins, and PATHEXT order decides
-# within a directory. That is the difference from the reverted Scoop-shims
-# shortcut, which jumped a privileged directory ahead of PATH.
+# `*.exe` ONLY, and that restriction is the whole point. A first version
+# enumerated every file in every PATH directory and filtered by PATHEXT in a
+# PowerShell loop: 140 ms, worse than the 62 ms of Get-Command probes it
+# replaced. The filesystem does the filtering here instead — measured at 22 ms
+# for a single `*.exe` pattern across PATH, and roughly 22 ms per additional
+# pattern, so more extensions would cost more than they save.
 #
-# No cache file, so there is nothing to invalidate: the index is rebuilt every
-# shell start. A tool installed mid-session is not seen until the next shell,
-# which is already true of everything else here.
+# Every tool this config resolves is a Scoop shim or a system .exe, so a
+# .exe-only index hits in practice. A MISS falls through to Get-Command, which
+# is correct but slow — and misses only happen for tools that are not
+# installed.
+#
+# Known limitation: a `.cmd` or `.bat` earlier on PATH than a same-named
+# `.exe` would be shadowed by the index, where the real resolver would prefer
+# the `.cmd`. `Test-CliBinIndex` compares the two and reports any such case.
+#
+# No cache file, so nothing to invalidate. A tool installed mid-session is not
+# seen until the next shell, which is already true of everything here.
 $CliBinIndex = @{}   # @{} is case-insensitive, matching Windows semantics
-$CliBinRank  = @{}
-$extRank = 0
-foreach ($x in ($env:PATHEXT -split ';' | Where-Object { $_ })) {
-    $CliBinRank[$x.TrimStart('.')] = $extRank++
-}
 foreach ($dir in ($env:PATH -split ';')) {
     $d = $dir.Trim('"')
     if (-not $d -or -not [IO.Directory]::Exists($d)) { continue }
-    foreach ($f in [IO.Directory]::EnumerateFiles($d)) {
-        $ext = [IO.Path]::GetExtension($f).TrimStart('.')
-        if (-not $CliBinRank.ContainsKey($ext)) { continue }
+    foreach ($f in [IO.Directory]::GetFiles($d, '*.exe')) {
         $n = [IO.Path]::GetFileNameWithoutExtension($f)
-        if (-not $CliBinIndex.ContainsKey($n)) {
-            $CliBinIndex[$n] = @{ Path = $f; Rank = $CliBinRank[$ext] }
-        } elseif ($CliBinIndex[$n].Rank -gt $CliBinRank[$ext]) {
-            # Same directory, better PATHEXT precedence (.exe before .cmd).
-            $CliBinIndex[$n] = @{ Path = $f; Rank = $CliBinRank[$ext] }
-        }
+        if (-not $CliBinIndex.ContainsKey($n)) { $CliBinIndex[$n] = $f }
     }
 }
-Remove-Variable extRank, CliBinRank
 
 # Applications only, by design. functions.ps1 deliberately uses Get-Command
 # for `scoop`, whose entry point may be a .ps1 rather than an application.
 function Get-CliBin {
     [OutputType([string])]
     param([Parameter(Mandatory)][string]$Name)
-    if ($CliBinIndex.ContainsKey($Name)) { return $CliBinIndex[$Name].Path }
+    if ($CliBinIndex.ContainsKey($Name)) { return $CliBinIndex[$Name] }
+    $cmd = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue |
+           Select-Object -First 1
+    if ($cmd) { return $cmd.Source }
     return $null
 }
 

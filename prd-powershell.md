@@ -419,6 +419,20 @@ it would have vanished silently under a naive deferral.
 | Measurement | Result | Decision |
 |---|---|---|
 | PATH index build | **22 ms** over 771 executables | **Built.** Against 62 ms for eight `Get-Command` probes alone, plus ~12 more probes inside `functions.ps1`. So the cost was per-probe, not command-discovery warm-up — an assumption held for three rounds and now falsified |
+
+⚠️ **The first index implementation did not match the benchmark that justified it.** The
+measurement used `GetFiles($d, '*.exe')`; the code used `EnumerateFiles($d)` and filtered
+by PATHEXT in a PowerShell loop — every file in every PATH directory, not just the
+executables. Result: "resolve binaries" went 62 → **140 ms** and the total went 386 →
+409 `[RUN]`. `functions.ps1` did drop 59 → 16 ms, confirming the probes were indeed its
+cost, but the index paid more than it saved.
+
+Rewritten to `*.exe` only, letting the filesystem do the filtering, with a `Get-Command`
+fallback on a miss. The trade is explicit: ~22 ms per pattern means additional extensions
+cost more than they save, and every tool here is a Scoop shim or a system `.exe`. The
+known limitation — a `.cmd` shadowing a same-named `.exe` earlier on PATH — is what
+`Test-CliBinIndex` exists to catch, and it currently agrees with `Get-Command` on all 24
+names `[RUN]`.
 | `starship prompt --continuation` spawn | **26 ms** | **Not built.** It requires regex surgery on a third-party generated script plus a new `starship.toml` mtime dependency in the freshness check. 26 ms does not buy that; the machinery/payoff rule says no |
 
 ### Ctrl+T and Alt+C removed
