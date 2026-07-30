@@ -11,7 +11,7 @@ One prompt, one tool set, one cheatsheet across three shells: **zsh**, **bash**,
 | Platform | Status | Shell | Prompt |
 |---|---|---|---|
 | Ubuntu 24.04 (WSL2) | deployed | zsh | starship, Pure preset |
-| Windows 11 | config written, untested | PowerShell 7 | the same `starship.toml` |
+| Windows 11 | deployed | PowerShell 7 | the same `starship.toml` |
 | Pop!\_OS 22.04 (laptop) | planned | zsh | — |
 | Debian 12 (server) | planned | bash | — |
 
@@ -45,11 +45,10 @@ cli_tools/
 │   ├── functions.ps1      the alias/function layer, ported to PowerShell
 │   ├── starship.toml      prompt (Pure emulation) — shared by all three shells
 │   └── README.md          install, load order, design rules
-├── bootstrap/
-│   ├── install.sh         idempotent Linux installer, --dry-run
-│   ├── install.ps1        idempotent Windows installer, -DryRun
-│   └── INSTALL.md         manual sequence, per-machine notes, troubleshooting
-└── archive/               superseded PDF/HTML/PNG renders
+└── bootstrap/
+    ├── install.sh         idempotent Linux installer, --dry-run
+    ├── install.ps1        idempotent Windows installer, -DryRun
+    └── INSTALL.md         manual sequence, per-machine notes, troubleshooting
 ```
 
 Each document answers one question and links to the others rather than repeating them. If two files start saying the same thing, one of them is wrong.

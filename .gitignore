@@ -11,5 +11,10 @@ desktop.ini
 *.swp
 *~
 
-# Nothing generated is tracked. Rendered PDF/HTML output goes to archive/,
-# which IS tracked deliberately — see archive/ in README.md.
+# Nothing generated is tracked. Rendered PDF/HTML/PNG output lives in archive/
+# and stays local — it is superseded by cheatsheet.md and only bloats clones.
+archive/
+
+# Working notes for the next session: local scratch, not part of the published
+# repo. Keep it, do not publish it.
+HANDOFF.md
