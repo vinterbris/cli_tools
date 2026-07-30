@@ -1,0 +1,51 @@
+# Build docs/index.html and publish it to GitHub Pages.
+#
+# UNTESTED: written without a GitHub Actions runner available. Run it once via
+# the Actions tab ("Run workflow") before relying on the release trigger.
+#
+# One-time setup: Settings -> Pages -> Source: "GitHub Actions".
+name: docs site
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install 'markdown>=3.4' 'pygments>=2.11'
+
+      # Non-zero exit means a doc links to a heading that no longer exists.
+      - run: python3 tools/build-site.py _site/index.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

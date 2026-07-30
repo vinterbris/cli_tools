@@ -11,10 +11,13 @@ desktop.ini
 *.swp
 *~
 
-# Nothing generated is tracked. Rendered PDF/HTML/PNG output lives in archive/
-# and stays local — docs/cheatsheet.md supersedes it. Note that untracking does
+# Old rendered PDF/PNG output, superseded by docs/cheatsheet.md. Untracking does
 # not remove the four blobs already in history; a clone still downloads them.
 archive/
+
+# Rendered docs site: built by tools/build-site.py, published by CI, never committed.
+docs/index.html
+_site/
 
 # Working notes for the next session: local scratch, not part of the published
 # repo. Keep it, do not publish it.
