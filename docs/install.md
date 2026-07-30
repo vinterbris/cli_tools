@@ -170,7 +170,7 @@ exec zsh
 ### Headless server
 
 ```bash
-./install.sh --skip-shell
+bootstrap/install.sh --skip-shell
 ```
 
 Consider trimming the tool list before running — `yazi`, `micro`, and `btop` are interactive and rarely wanted on a box you only ssh into. Edit the `TOOLS` array in `install.sh`.

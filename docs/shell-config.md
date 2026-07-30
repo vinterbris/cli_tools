@@ -19,29 +19,9 @@ Files are dotless here so they stay visible in file browsers. The dot is added a
 
 ## Install
 
-Automated: [`../bootstrap/install.sh`](../bootstrap/install.sh) does everything below plus tool installation. The manual path follows.
+[`../bootstrap/install.sh`](../bootstrap/install.sh) does it, and the manual equivalent — backup, symlinks, plugins, git config, `chsh` — is [`install.md`](install.md#6-config). This page explains what the installed files then do; it does not repeat the steps.
 
-Back up first — Debian ships a default `~/.bashrc`:
-
-```bash
-mkdir -p ~/.dotfiles-backup
-for f in .bashrc .zshrc .shell_common; do
-  [ -e ~/$f ] && cp -a ~/$f ~/.dotfiles-backup/
-done
-```
-
-Symlink, so edits in the repo take effect with no re-copy:
-
-```bash
-REPO=~/path/to/cli_tools/dotfiles
-ln -sf "$REPO/shell_common" ~/.shell_common
-ln -sf "$REPO/zshrc"        ~/.zshrc
-ln -sf "$REPO/bashrc"       ~/.bashrc
-mkdir -p ~/.config
-ln -sf "$REPO/starship.toml" ~/.config/starship.toml
-```
-
-Copy instead of symlink if the repo lives on `/mnt/c` — WSL reads the Windows filesystem slowly, and rc files are read on every shell start.
+Symlinks, not copies, so an edit in the repo takes effect with no re-install. One exception: if the repo has to live on `/mnt/c`, copy instead. WSL reads the Windows filesystem slowly and rc files are read on every shell start.
 
 ## Machine-local additions
 
@@ -56,26 +36,9 @@ Put machine-specific `PATH` entries, work credentials, and per-host toolchain ex
 
 Neither rc file hard-fails on a missing tool — every line is guarded by `command -v`. Install order and per-tool install commands are in [`modern-cli-tools.md`](modern-cli-tools.md#installation).
 
-Zsh plugins are not vendored:
-
-```bash
-mkdir -p ~/.zsh
-git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions     ~/.zsh/zsh-autosuggestions
-git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting ~/.zsh/zsh-syntax-highlighting
-```
+Two things the rc files assume but do not create: the zsh plugins, which are cloned rather than vendored, and `delta`'s one-time global git config. Both are [step 7 of `install.md`](install.md#7-plugins-and-git).
 
 `starship.toml` is the official [Pure preset](https://starship.rs/presets/pure-preset), copied verbatim so it can be regenerated with `starship preset pure-preset -o -` and diffed against upstream. Edit freely — the header comment records where it came from.
-
-One-time git config for `delta`:
-
-```bash
-git config --global core.pager delta
-git config --global interactive.diffFilter 'delta --color-only'
-git config --global delta.navigate true
-git config --global delta.line-numbers true
-git config --global delta.side-by-side true
-git config --global merge.conflictStyle zdiff3
-```
 
 ## Load order — the rules that actually bite
 
