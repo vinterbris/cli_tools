@@ -15,7 +15,7 @@ Verified against Ubuntu 22.04 and 24.04. Written for Pop!\_OS 22.04 and Debian 1
 ## Fast path
 
 ```bash
-git clone <this-repo> ~/cli_tools
+git clone https://github.com/vinterbris/cli_tools.git ~/cli_tools
 cd ~/cli_tools/bootstrap
 ./install.sh --dry-run          # read what it intends to do
 ./install.sh --install-managers # do it
