@@ -4,7 +4,7 @@
 # Idempotent: safe to re-run. Installs only what is missing.
 #
 # Targets: Ubuntu 24.04 (WSL), Pop!_OS 22.04, Debian 12.
-# See INSTALL.md for the manual equivalent.
+# See docs/install.md for the manual equivalent.
 
 set -euo pipefail
 

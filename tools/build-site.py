@@ -33,14 +33,16 @@ ICONS = {
 # Groups name what a document *is*, not which OS it targets: every page except
 # powershell.md is cross-platform, so an OS-based grouping would misfile most of them.
 # "" is the ungrouped slot at the top — README is the index, not a category.
+# Every page is README.md or docs/*.md — nothing is picked out of bootstrap/ or dotfiles/,
+# which hold runnable files only. Their README stubs deliberately stay out of the site.
 PAGES = [
     ("home",          "README.md",              "Overview",       "",          "home"),
-    ("install",       "bootstrap/INSTALL.md",   "Installation",   "Setup",     "download"),
-    ("dotfiles",      "dotfiles/README.md",     "Dotfiles",       "Setup",     "file"),
+    ("install",       "docs/install.md",        "Install",        "Setup",     "download"),
+    ("shell-config",  "docs/shell-config.md",   "Shell config",   "Setup",     "file"),
     ("cheatsheet",    "docs/cheatsheet.md",     "Cheatsheet",     "Reference", "rows"),
     ("usecases",      "docs/usecases.md",       "Use cases",      "Reference", "terminal"),
     ("tools",         "docs/modern-cli-tools.md","Tool selection","Reference", "sliders"),
-    ("powershell",    "docs/powershell.md",     "PowerShell 7",   "Reference", "window"),
+    ("windows",       "docs/windows.md",        "Windows",        "Reference", "window"),
     ("learning-plan", "docs/learning-plan.md",  "Learning plan",  "Practice",  "trend"),
 ]
 FILE2PAGE = {p[1]: p[0] for p in PAGES}

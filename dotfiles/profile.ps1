@@ -15,8 +15,8 @@
 #      at it with environment variables, never by copying files.
 #    - Machine-local settings go in profile.local.ps1, untracked, loaded last.
 #
-#  Load order and the constraints behind it: dotfiles/README.md
-#  Design history, constraints and rejected options: ../docs/powershell.md
+#  Load order and the constraints behind it: docs/shell-config.md
+#  Design history, constraints and rejected options: ../docs/windows.md
 # ─────────────────────────────────────────────────────────────
 
 # --- startup timing ---------------------------------------------

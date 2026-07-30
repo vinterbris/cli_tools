@@ -19,40 +19,44 @@ One prompt, one tool set, one cheatsheet across three shells: **zsh**, **bash**,
 
 | If you want to | Read |
 |---|---|
-| Set up a new Linux machine | [bootstrap/INSTALL.md](bootstrap/INSTALL.md) |
-| Set up Windows / PowerShell | [docs/powershell.md](docs/powershell.md), then `bootstrap/install.ps1 -DryRun` |
+| Set up a Linux / WSL machine | [docs/install.md](docs/install.md) |
+| Set up Windows / PowerShell 7 | [docs/windows.md](docs/windows.md) — start there, it routes you |
 | Look up a command or flag | [docs/cheatsheet.md](docs/cheatsheet.md) — or type `cs <term>` |
 | Solve a specific task | [docs/usecases.md](docs/usecases.md) |
 | Learn this systematically | [docs/learning-plan.md](docs/learning-plan.md) |
 | Know why these tools | [docs/modern-cli-tools.md](docs/modern-cli-tools.md) |
-| Change the config | [dotfiles/README.md](dotfiles/README.md) |
+| Change the config | [docs/shell-config.md](docs/shell-config.md) |
 
 ## Layout
 
 ```
 cli_tools/
 ├── README.md              this index
-├── docs/
+├── docs/                  every document lives here — one question each
+│   ├── install.md           manual sequence, per-machine notes, troubleshooting
+│   ├── windows.md           Windows entry point: what differs and why
+│   ├── shell-config.md      the config explained — load order, design rules
 │   ├── modern-cli-tools.md  why this set — rationale, tier list, counter-arguments
 │   ├── cheatsheet.md        what to type — dense, print-oriented
 │   ├── usecases.md          how to solve a task — ordered by frequency
-│   ├── learning-plan.md     how to absorb it — phases, not weeks
-│   └── powershell.md        the Windows half: constraints, decisions, startup cost
-├── dotfiles/              runnable config
+│   └── learning-plan.md     how to absorb it — phases, not weeks
+├── dotfiles/              runnable config, no prose
 │   ├── shell_common       aliases, exports, functions (bash + zsh)
 │   ├── zshrc              zsh init
 │   ├── bashrc             bash init
 │   ├── profile.ps1        PowerShell 7 init
 │   ├── functions.ps1      the alias/function layer, ported to PowerShell
-│   ├── starship.toml      prompt (Pure emulation) — shared by all three shells
-│   └── README.md          install, load order, design rules
-└── bootstrap/
-    ├── install.sh         idempotent Linux installer, --dry-run
-    ├── install.ps1        idempotent Windows installer, -DryRun
-    └── INSTALL.md         manual sequence, per-machine notes, troubleshooting
+│   └── starship.toml      prompt (Pure emulation) — shared by all three shells
+├── bootstrap/             installers, no prose
+│   ├── install.sh         idempotent Linux installer, --dry-run
+│   └── install.ps1        idempotent Windows installer, -DryRun
+└── tools/
+    └── build-site.py      renders README + docs/ into a single docs/index.html
 ```
 
-Each document answers one question and links to the others rather than repeating them. If two files start saying the same thing, one of them is wrong.
+Documentation lives in `docs/` and nowhere else; `dotfiles/` and `bootstrap/` hold files
+that run. Each document answers one question and links to the others rather than
+repeating them. If two files start saying the same thing, one of them is wrong.
 
 ## Quick install
 
@@ -77,7 +81,7 @@ git clone https://github.com/vinterbris/cli_tools.git $HOME\cli_tools
 
 Applied throughout, and the reason the config looks the way it does:
 
-- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed` do what a pasted script or `man` example expects. New tools get new names. Three sanctioned exceptions on Linux: `rm -I`, `df`→`duf`, and `grep`→`ug` — which accepts GNU grep's flags but not its output ordering or path prefixes, so scripts should call `\grep`. **Zero on Windows** — see [dotfiles/README.md](dotfiles/README.md#powershell-specific) for why each one loses its justification there.
+- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed` do what a pasted script or `man` example expects. New tools get new names. Three sanctioned exceptions on Linux: `rm -I`, `df`→`duf`, and `grep`→`ug` — which accepts GNU grep's flags but not its output ordering or path prefixes, so scripts should call `\grep`. **Zero on Windows** — see [docs/shell-config.md](docs/shell-config.md#powershell-specific) for why each one loses its justification there.
 - **No framework.** oh-my-zsh replaced by two `source` lines. Nothing is loaded that you cannot point at.
 - **Guarded everywhere.** Every tool reference is wrapped in `command -v`, so the config works on a bare machine and lights up as you install.
 - **Machine-local settings never touch tracked files** — `~/.zshrc.local` and `~/.bashrc.local` are sourced at the end.

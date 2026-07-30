@@ -2,13 +2,21 @@
 tags: [cli, powershell, windows]
 ---
 
-# PowerShell 7
+# Windows / PowerShell 7
 
-The same tool set and the same `starship.toml` as the Linux config, driven from
-`dotfiles/profile.ps1`. This page is the *why*: the constraints that make the Windows
-half look different from the Unix half. For what to type, see
-[cheatsheet.md](cheatsheet.md#powershell--start-here). For installation, see
-[../bootstrap/INSTALL.md](../bootstrap/INSTALL.md#windows--powershell-7).
+Start here if you work on Windows. The tool set and the `starship.toml` are the same as
+on Linux, driven from `dotfiles/profile.ps1`; a dozen names and five constraints are not.
+
+| Step | Where |
+|---|---|
+| 1. Install | [install.md#windows--powershell-7](install.md#windows--powershell-7) — Scoop, no admin rights |
+| 2. Verify | `Test-CliToolsSetup` — name collisions and missing tools |
+| 3. What to type | [cheatsheet.md#powershell--start-here](cheatsheet.md#powershell--start-here) — the dozen names that differ |
+| 4. Why it differs | this page, below |
+| 5. Change the config | [shell-config.md#powershell-7](shell-config.md#powershell-7) — load order and design rules |
+
+The rest of this page is the *why*: the constraints that make the Windows half look
+different from the Unix half.
 
 ## Scope
 
@@ -124,4 +132,4 @@ executed and should be treated as untested:
 - **The replace-and-backup branch.** `$PROFILE` did not exist on the machine, so the
   installer took the create branch. What happens to an existing `$PROFILE` is
   review-level only.
-- **Every rollback step** in [../bootstrap/INSTALL.md](../bootstrap/INSTALL.md).
+- **Every rollback step** in [install.md](install.md).

@@ -13,7 +13,7 @@
 #     the same name, silently. So none of the names below may collide with
 #     one — `Test-CliToolsSetup` at the bottom enforces that.
 #
-#  Deliberately NOT ported (see ../docs/powershell.md):
+#  Deliberately NOT ported (see ../docs/windows.md):
 #    git aliases  — git is used from WSL; `g` passthrough is enough
 #    grep→ug      — Windows has no grep to improve on; use rg or sls
 #    df→duf       — no df to override; duf keeps its own name

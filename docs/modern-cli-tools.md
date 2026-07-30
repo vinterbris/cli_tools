@@ -231,7 +231,7 @@ curl -s "$URL" | jq -r '.data[].id'
 **Why:** side-by-side diffs, syntax highlighting, word-level highlighting, line numbers. Highest ratio of visual improvement to configuration effort on this whole list.
 
 ```bash
-git diff                     # via core.pager (set in dotfiles/README.md)
+git diff                     # via core.pager (set in docs/shell-config.md)
 git show HEAD~1
 delta a.py b.py
 git -c delta.side-by-side=true diff
@@ -436,7 +436,7 @@ curl -sS https://webi.sh/<tool> | sh                              # single binar
 
 ## Shell setup
 
-The config is not embedded here — it lives as runnable files in [`dotfiles/`](../dotfiles/), symlinked into `$HOME`. See [`dotfiles/README.md`](../dotfiles/README.md) for install, load-order rules, `delta` git config, and the design rules the aliases follow.
+The config is not embedded here — it lives as runnable files in [`dotfiles/`](../dotfiles/), symlinked into `$HOME`. See [`docs/shell-config.md`](shell-config.md) for install, load-order rules, `delta` git config, and the design rules the aliases follow.
 
 | File | Installed as | Contents |
 |---|---|---|

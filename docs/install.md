@@ -2,9 +2,11 @@
 tags: [cli, install, bootstrap]
 ---
 
-# Bootstrap
+# Install
 
-Raise a working environment on a fresh Debian-family box.
+Raise a working environment on a fresh Debian-family box. Windows is further down, in
+[Windows / PowerShell 7](#windows--powershell-7); the scripts themselves are in
+[`../bootstrap/`](../bootstrap/).
 
 Verified against Ubuntu 22.04 and 24.04. Written for Pop!\_OS 22.04 and Debian 12 as well — both are apt-based, and every version-sensitive decision is made at runtime rather than hardcoded per release.
 
@@ -214,7 +216,7 @@ Removing the symlinks alone is enough to disable everything — the installed to
 
 # Windows / PowerShell 7
 
-Separate installer: [`install.ps1`](install.ps1). Same idea, different mechanics — no symlinks, no copies, and Scoop instead of apt.
+Separate installer: [`../bootstrap/install.ps1`](../bootstrap/install.ps1). Same idea, different mechanics — no symlinks, no copies, and Scoop instead of apt.
 
 ## Fast path
 
@@ -264,7 +266,7 @@ Consequence: **moving the repo breaks the shell**, because the stub holds an abs
 
 ## Config policy
 
-The repo is the single source of truth; tools are pointed at it with environment variables rather than by copying files. Rationale and the rejected alternative are in [../docs/powershell.md](../docs/powershell.md#config-policy).
+The repo is the single source of truth; tools are pointed at it with environment variables rather than by copying files. Rationale and the rejected alternative are in [windows.md](windows.md#config-policy).
 
 Trade-off worth knowing: a tool launched from *outside* pwsh — from Explorer, or another shell — will not see those variables and falls back to its own default location.
 
@@ -278,7 +280,7 @@ Test-CliToolsCache                                    # is the cache being used
 Clear-CliToolsCache                                   # wipe it
 ```
 
-Measured on the reference machine: 181 ms for a bare `pwsh -NoProfile`, ~386 ms inside the profile. The largest remaining items are the `PSFzf` and `PSReadLine` module loads. Full breakdown in [../docs/powershell.md](../docs/powershell.md#startup-cost).
+Measured on the reference machine: 181 ms for a bare `pwsh -NoProfile`, ~386 ms inside the profile. The largest remaining items are the `PSFzf` and `PSReadLine` module loads. Full breakdown in [windows.md](windows.md#startup-cost).
 
 ## Troubleshooting
 
