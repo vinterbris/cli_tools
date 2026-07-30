@@ -12,7 +12,8 @@ desktop.ini
 *~
 
 # Nothing generated is tracked. Rendered PDF/HTML/PNG output lives in archive/
-# and stays local — it is superseded by cheatsheet.md and only bloats clones.
+# and stays local — docs/cheatsheet.md supersedes it. Note that untracking does
+# not remove the four blobs already in history; a clone still downloads them.
 archive/
 
 # Working notes for the next session: local scratch, not part of the published

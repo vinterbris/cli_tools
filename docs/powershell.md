@@ -27,9 +27,9 @@ rights, current versions, one `scoop update *`. Windows Terminal is assumed.
 
 3. **Overriding `ls` breaks the object pipeline.** `ls | Where-Object Length -gt 1MB`
    works today. An `eza` function returns strings and silently breaks it. The repo's
-   "core commands keep core behaviour" rule has sharper teeth here, which is why there
-   are **zero** aliasing exceptions on Windows against three on Linux — `grep`→`ug`,
-   `df`→`duf`, `top`→`btop` and `h`→`tldr` were all dropped.
+   "core commands keep core behaviour" rule has sharper teeth here: **no core command
+   is overridden at all on Windows.** Every Linux name that shadows one — `grep`→`ug`,
+   `df`→`duf`, `top`→`btop`, `h`→`tldr`, `rm -I` — was dropped rather than ported.
 
 4. **fzf has no `--powershell` init.** Bindings come from the `PSFzf` module, not from
    `FZF_CTRL_T_COMMAND` / `FZF_ALT_C_COMMAND`. `Ctrl-R` is not bound by PSFzf unless
@@ -70,10 +70,22 @@ not the environment.
 
 ## Startup cost
 
-Every `<tool> init` spawns a process. Four of them at once pushed a new tab past a
-second, so the init output is cached on disk and re-read; `Test-CliToolsCache` reports
-whether the cache is actually being used. Profile load is ~380 ms, down from 847 ms at
-the first working build.
+Every `<tool> init` spawns a process. Four of them cost 666 ms on every new tab at the
+first working build, and more tools were coming, so the init output is cached on disk
+and dot-sourced instead; `Test-CliToolsCache` reports whether the cache is actually
+being used.
+
+Measured on the reference machine, warm, averaged over five runs `[RUN]`:
+
+| | ms |
+|---|---|
+| bare `pwsh -NoProfile` | 181 |
+| inside the profile, first working build | 460 |
+| inside the profile, current | 386 |
+
+Two numbers circulate for the current figure. **386 is the shipped one.** 380 was a PATH
+index that was measured and then reverted — 35 lines and a correctness limitation for
+about 6%.
 
 Measured, not assumed — and the one finding worth carrying: Steve Lee's
 [`Initialize-Profile`](https://devblogs.microsoft.com/powershell/optimizing-your-profile/)
@@ -87,8 +99,9 @@ are too coarse to explain what they find.
 
 **The repo is the single source of truth; tools are pointed at it with environment
 variables.** Nothing is copied into a tool's conventional location. Today that means
-`$STARSHIP_CONFIG` and `$CLI_DOCS`; the same shape applies to `$BAT_CONFIG_PATH` as
-configs appear.
+`$STARSHIP_CONFIG`; the same shape applies to `$BAT_CONFIG_PATH` as configs appear.
+(`$CLI_DOCS` looks similar but is not the same thing — no tool reads it, only this
+repo's own `cs` function.)
 
 Rejected: having `install.ps1` distribute files into each tool's native directory. It
 would make a config findable when a tool launches from outside pwsh, but it reintroduces

@@ -1,6 +1,6 @@
 # dotfiles
 
-Runnable shell config. This directory is the config itself, not documentation of it — rationale is in [`../modern-cli-tools.md`](../docs/modern-cli-tools.md), commands in [`../cheatsheet.md`](../docs/cheatsheet.md), automated install in [`../bootstrap/`](../bootstrap/INSTALL.md).
+Runnable shell config. This directory is the config itself, not documentation of it — rationale is in [`../docs/modern-cli-tools.md`](../docs/modern-cli-tools.md), commands in [`../docs/cheatsheet.md`](../docs/cheatsheet.md), automated install in [`../bootstrap/`](../bootstrap/INSTALL.md).
 
 | File | Goes to | Purpose |
 |---|---|---|
@@ -50,7 +50,7 @@ Put machine-specific `PATH` entries, work credentials, and per-host toolchain ex
 
 ## Dependencies
 
-Neither rc file hard-fails on a missing tool — every line is guarded by `command -v`. Install order and per-tool install commands are in [`../modern-cli-tools.md`](../docs/modern-cli-tools.md#installation).
+Neither rc file hard-fails on a missing tool — every line is guarded by `command -v`. Install order and per-tool install commands are in [`../docs/modern-cli-tools.md`](../docs/modern-cli-tools.md#installation).
 
 Zsh plugins are not vendored:
 

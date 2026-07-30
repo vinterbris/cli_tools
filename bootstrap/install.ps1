@@ -248,6 +248,6 @@ if ($DryRun) {
     Say "Next:"
     Say "  1. Start a new pwsh session."
     Say "  2. `$env:CLI_TOOLS_SELFCHECK=1; pwsh -NoLogo   # reports shadowed names and missing tools"
-    Say "  3. Measure-Command { pwsh -NoLogo -Command exit }   # target: under 400 ms"
-    Say "  4. Try: Ctrl+T, Ctrl+R, Alt+C, z, cs, ll, tp"
+    Say "  3. Measure-Command { pwsh -NoLogo -Command exit }   # ~570 ms on the reference machine"
+    Say "  4. Try: Ctrl+R, Alt+A, z, zi, fe, cs, ll, tp        # Ctrl+T and Alt+C are deliberately unbound"
 }

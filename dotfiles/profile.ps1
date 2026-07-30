@@ -31,8 +31,12 @@ function Write-CliTiming {
 
 # --- locate the docs --------------------------------------------
 # $PSScriptRoot is <repo>\dotfiles, so the repo can be cloned anywhere.
-# CLI_DOCS points at <repo>\docs — the same override name shell_common uses.
-$env:CLI_DOCS = Join-Path (Split-Path -Parent $PSScriptRoot) 'docs'
+# CLI_DOCS points at <repo>\docs. Honoured if already set, matching
+# _cli_docs() in shell_common — otherwise a deliberate override would be
+# silently overwritten on every shell start.
+if (-not $env:CLI_DOCS) {
+    $env:CLI_DOCS = Join-Path (Split-Path -Parent $PSScriptRoot) 'docs'
+}
 
 # --- resolve real executable paths ------------------------------
 # Full paths, not bare names: fzf on Windows runs --preview and

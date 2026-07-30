@@ -444,7 +444,7 @@ The config is not embedded here — it lives as runnable files in [`dotfiles/`](
 | `dotfiles/zshrc` | `~/.zshrc` | setopts, compinit, plugins, tool init |
 | `dotfiles/bashrc` | `~/.bashrc` | shopts, completion, tool init |
 
-Governing rule, applied throughout: **new names for new tools; core commands keep core behaviour.** Three sanctioned exceptions — `rm -I` (same binary, added flag), `df`→`duf` (read-only), `grep`→`ug` (GNU-grep-flag-compatible, and a no-op until ugrep is installed).
+Governing rule, applied throughout: **new names for new tools; core commands keep core behaviour.** Three sanctioned exceptions — `rm -I` (same binary, added flag), `df`→`duf` (read-only), `grep`→`ug` (a no-op until ugrep is installed, and narrower than "compatible" — see [ripgrep](#ripgrep-rg--replaces-grep--r) above).
 
 Every tool reference is guarded by `command -v`, so the files work on a box with none of this installed and light up as you install.
 

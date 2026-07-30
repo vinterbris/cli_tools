@@ -243,7 +243,7 @@ If Scoop is missing, `install.ps1` prints the two commands and stops.
 3. Installs the `PSFzf` module from the PowerShell Gallery.
 4. Writes `$PROFILE` as a one-line stub that dot-sources `dotfiles\profile.ps1`.
 
-Nothing is deleted. An existing `$PROFILE` is copied to `<profile>.bak-<timestamp>` first.
+Nothing is deleted. An existing `$PROFILE` is copied to `<profile>.bak-<timestamp>` first. ⚠️ **That branch has never executed** — `$PROFILE` did not exist on the reference machine, so the installer took the create path. Back up by hand before the first run on a machine that already has a profile.
 
 ## Options
 
@@ -264,7 +264,7 @@ Consequence: **moving the repo breaks the shell**, because the stub holds an abs
 
 ## Config policy
 
-The repo is the single source of truth. Tools are pointed at it with environment variables — `$STARSHIP_CONFIG` today, `$BAT_CONFIG_PATH` and friends as configs appear. Nothing is copied into a tool's conventional directory.
+The repo is the single source of truth; tools are pointed at it with environment variables rather than by copying files. Rationale and the rejected alternative are in [../docs/powershell.md](../docs/powershell.md#config-policy).
 
 Trade-off worth knowing: a tool launched from *outside* pwsh — from Explorer, or another shell — will not see those variables and falls back to its own default location.
 
@@ -278,7 +278,7 @@ Test-CliToolsCache                                    # is the cache being used
 Clear-CliToolsCache                                   # wipe it
 ```
 
-Measured on the reference machine: 181 ms for a bare `pwsh -NoProfile`, ~550 ms inside the profile. The largest remaining items are the `PSFzf` and `PSReadLine` module loads.
+Measured on the reference machine: 181 ms for a bare `pwsh -NoProfile`, ~386 ms inside the profile. The largest remaining items are the `PSFzf` and `PSReadLine` module loads. Full breakdown in [../docs/powershell.md](../docs/powershell.md#startup-cost).
 
 ## Troubleshooting
 
