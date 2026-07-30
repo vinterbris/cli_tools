@@ -374,12 +374,27 @@ path, so Linux needs a link; PowerShell lets the stub point anywhere. The WSL co
 exists for a different reason — `/mnt/c` is slow and rc files are read on every shell
 start.
 
-🔴 **The repo is in the wrong directory.** It lives under
-`C:\Users\Vinterbris\_CLAUDE_DESKTOP_PROJECTS\cli_tools`, a working folder belonging to
-another tool, and that absolute path is hardcoded into `$PROFILE`. Renaming or
-reorganising those project folders breaks the shell at startup with a non-obvious
-cause. Agreed move: `C:\Users\Vinterbris\cli_tools`. Two steps — move the directory,
-re-run `install.ps1 -SkipTools` to regenerate the stub.
+**Two working copies on Windows, by design.**
+
+- `C:\Users\Vinterbris\cli_tools` — the clone the shell loads. `$PROFILE` points here.
+- `C:\Users\Vinterbris\_CLAUDE_DESKTOP_PROJECTS\cli_tools` — the agent's working copy.
+
+The original plan was to move the repo out of the agent's folder and delete it, because
+`$PROFILE` holds an absolute path and a folder belonging to another tool is a poor place
+for a permanent config. Sergey kept both instead: the agent needs its copy to work in,
+and a second clone costs nothing. `$PROFILE` points at `~\cli_tools`, so nothing depends
+on the agent's path.
+
+Changes travel by git, not by copying. To avoid a GitHub round-trip, the agent's copy is
+usable as a local remote:
+
+```powershell
+cd $HOME\cli_tools
+git remote add agent 'C:\Users\Vinterbris\_CLAUDE_DESKTOP_PROJECTS\cli_tools'
+git pull agent main
+```
+
+After any move of either copy, re-run `install.ps1 -SkipTools` to rewrite the stub.
 
 | Thing | Location | Status |
 |---|---|---|
@@ -443,6 +458,38 @@ The reviewer traced both preview strings character by character and found the qu
 correctly paired, while noting — correctly — that static analysis cannot settle fzf's
 Windows-side re-quoting. That still needs a live `Ctrl+T`.
 
+## 8b. Second adversarial review, 2026-07-30 — publication readiness
+
+Brief was "judge this as a PowerShell-literate stranger landing on a public repo".
+Eight findings, all accepted.
+
+| Severity | Finding | Resolution |
+|---|---|---|
+| HIGH | The `CLI_TOOLS_NO_CACHE` bypass had no empty-output guard, unlike the cached path — so in the one mode intended for troubleshooting, a broken tool would leave its integration silently absent | **Fixed.** Generation is one scriptblock used by both paths, and it throws on empty output |
+| MEDIUM | `Get-CliBin` returned the Scoop shim even when a different binary of the same name came earlier on `PATH` — a function claiming to resolve a name while ignoring `PATH` order | **Fixed by removing the shim fast path entirely.** It was added for speed; comparing measurements, "resolve binaries" was 66 ms before it and 63–65 ms after, with two more probes. It bought ~20 ms and cost correctness. Now plain `Get-Command`. The 60 ms floor is command-discovery warm-up, not the probes |
+| MEDIUM | `dus` swallowed access-denied per directory, producing totals that look complete and are not | **Fixed.** Unreadable items are counted and a warning states the totals are partial |
+| MEDIUM | `functions.ps1` dot-sourced alone fails confusingly: the `$EzaBin` guards quietly evaluate false, then the first `Get-CliBin` throws and everything after it — `tp`, `cs`, the dot functions, the self-check — is never defined | **Fixed.** An explicit guard at the top throws a message naming the actual requirement |
+| LOW-MED | `Mark` broke the file's own `Verb-Noun` convention and sat in the global session as a bare generic verb | **Fixed.** Renamed `Write-CliTiming`, and the comment now states plainly that dot-sourcing offers no private scope, rather than leaving it unaddressed |
+| LOW | Dead ternary: `Get-CliBin $(if ($n -eq 'carapace') { 'carapace' } else { $n })` — both branches yield `$n`, a fossil of the `carapace-bin`/`carapace.exe` rename | **Fixed.** Plain `Get-CliBin $n` |
+| LOW | The cache-write failure path discarded already-captured output and spawned the binary a second time, in the file whose premise is that spawns are expensive | **Fixed.** Reuses `$generated` |
+| LOW | `Invoke-Expression` trips `PSAvoidUsingInvokeExpression` on sight | **Kept, now justified in place.** It is how these tools ship their init; the trust boundary is the local binary, not user input. Reduced to the two non-happy paths — the common path dot-sources the cache file |
+
+**Comments cut**, on the reviewer's argument that narrating fixed bugs is noise in a
+public repo rather than rationale: the `Set-Item 'Function:..'` post-mortem, the "an
+earlier version omitted this table" paragraph, the "Reviewed and kept deliberately"
+code-review artefact in the EDITOR block, and duplicated eza reasoning in the
+Terminal-Icons note. History belongs in this document; the code keeps only what a
+maintainer needs. Comment-to-code ratio is now ~0.74 in both files, which is still high
+but every remaining comment states a constraint rather than a war story.
+
+Verified as accurate by the reviewer, not merely asserted: `Invoke-PsFzfRipgrep` is
+genuinely exported by PSFzf; junegunn/fzf#1018 does describe the cmd.exe preview
+routing; and Scoop's `shim()` does `Copy-Item … -Force` on every shim creation, which
+is what makes the timestamp-based cache invalidation work.
+
+Also added: `[CmdletBinding()]` where missing, `[OutputType([string])]` on `Get-CliBin`,
+and `SupportsShouldProcess` on `Clear-CliToolsCache` — it deletes a directory.
+
 ## 9. What has actually happened
 
 | | |
@@ -459,6 +506,6 @@ Windows-side re-quoting. That still needs a live `Ctrl+T`.
 | ✅ | It loads and works. `Test-CliToolsSetup` reports `cli_tools: OK` — no shadowed names, all 17 tools resolvable. `z`, `ll`, `b`, `..` confirmed working by hand `[RUN]` |
 | ✅ | `cheatsheet.md` now has a PowerShell block: what to press, every name that differs from Linux and why, a runnable example for each command he had not used, the diagnostic switches, and the escape hatches. Written with real invocations rather than an alias→command table, because the gap was "I don't know how to use these", not "I forgot the flag" |
 | ✅ | `bootstrap/INSTALL.md` has a Windows section: fast path, prerequisites, what the installer does and why success is judged by post-condition, the no-symlink rationale, config policy, startup cost, a troubleshooting table built from the failures actually hit in this project, and rollback |
-| 🟡 | Two working copies on Windows by design: the agent edits `_CLAUDE_DESKTOP_PROJECTS\cli_tools`, and `$PROFILE` points at a separate clone. Changes travel commit → push → pull. Adding the agent's copy as a local git remote in the clone would remove the GitHub round-trip |
+| ✅ | Repo cloned to `C:\Users\Vinterbris\cli_tools`; `$PROFILE` points there. The agent's copy stays where it is, and changes travel by git — see §7a |
 | ✅ | **`Ctrl+T` freeze: diagnosed and fixed, hypothesis confirmed by measurement.** In `$HOME`, `fd -tf -HI --exclude .git` took **3305 ms**; with `-I` dropped and `AppData`/`node_modules` excluded, **235 ms** — 14× `[RUN]`. `Alt+C` was unaffected because it lists directories only, of which there are orders of magnitude fewer. The Linux config's `-HI` is fine on Linux and wrong in a Windows home directory, where `AppData` lives |
 | 🔴 | The replace-and-backup path in `install.ps1` is still untested: `$PROFILE` did not exist, so it took the create branch |

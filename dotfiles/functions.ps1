@@ -13,7 +13,7 @@
 #     the same name, silently. So none of the names below may collide with
 #     one — `Test-CliToolsSetup` at the bottom enforces that.
 #
-#  Deliberately NOT ported (see ../prd-powershell.md §5.2):
+#  Deliberately NOT ported (see ../prd-powershell.md portability audit):
 #    git aliases  — git is used from WSL; `g` passthrough is enough
 #    grep→ug      — Windows has no grep to improve on; use rg or sls
 #    df→duf       — no df to override; duf keeps its own name
@@ -23,6 +23,15 @@
 #    h→tldr       — h is Get-History; call tldr by name
 #    rm -I / mv -i / cp -i — no -I equivalent, see `tp` below
 # ─────────────────────────────────────────────────────────────
+
+# Fail immediately and clearly if this file is dot-sourced on its own.
+# Without the guard the failure is confusing rather than absent: the
+# `if ($EzaBin)` blocks quietly evaluate false, then the first Get-CliBin
+# call throws "term not recognized" and everything after it — tp, cs, the
+# dot-directory functions, Test-CliToolsSetup — is never defined.
+if (-not (Get-Command Get-CliBin -ErrorAction SilentlyContinue)) {
+    throw 'functions.ps1 requires profile.ps1: dot-source that instead, it loads this file itself.'
+}
 
 # --- ls / eza ---------------------------------------------------
 # `ls` stays Get-ChildItem. This is stricter than the Linux config, and
@@ -68,20 +77,33 @@ if ($FdBin) {
 # --- disk -------------------------------------------------------
 if (Get-CliBin dust) { function dsz { dust -d 2 @args } }
 
-# `du -sh * | sort -h` equivalent. Get-ChildItem is used rather than a
-# shelled-out tool so it works on a machine with nothing installed.
+# `du -sh * | sort -h` equivalent. Get-ChildItem rather than a shelled-out
+# tool, so it works on a machine with nothing installed.
+#
+# Unreadable subdirectories are counted and reported. Suppressing the errors
+# without saying so would produce a total that looks complete and is not;
+# `du` at least writes to stderr while totalling what it can.
 function dus {
-    Get-ChildItem -Force | ForEach-Object {
+    [CmdletBinding()]
+    param()
+    $denied = 0
+    $rows = Get-ChildItem -Force | ForEach-Object {
         $bytes = if ($_.PSIsContainer) {
-            (Get-ChildItem $_.FullName -Recurse -Force -File -ErrorAction SilentlyContinue |
-             Measure-Object Length -Sum).Sum
+            $errs = @()
+            $sum = (Get-ChildItem $_.FullName -Recurse -Force -File -ErrorAction SilentlyContinue -ErrorVariable +errs |
+                    Measure-Object Length -Sum).Sum
+            $denied += $errs.Count
+            $sum
         } else { $_.Length }
         [pscustomobject]@{
             Size = [int64]($bytes ?? 0)
             MB   = [math]::Round(($bytes ?? 0) / 1MB, 1)
             Name = $_.Name
         }
-    } | Sort-Object Size -Descending | Format-Table MB, Name -AutoSize
+    } | Sort-Object Size -Descending
+
+    $rows | Format-Table MB, Name -AutoSize | Out-String | Write-Host
+    if ($denied) { Write-Warning "$denied item(s) could not be read — totals are partial. Use -Verbose on Get-ChildItem to see which." }
 }
 
 # --- process ----------------------------------------------------
@@ -223,15 +245,9 @@ if (Get-CliBin glow) { function mdv { glow @args } }
 
 function path { $env:PATH -split ';' | Where-Object { $_ } }
 
-# Plain `function ..`, and this is the second attempt.
-#
-# The first version used `Set-Item -Path 'Function:..'` on the theory that a
-# dot-only function name might not parse. It was the opposite: `function ..`
-# parses fine, and Set-Item is the one that fails — it resolves `Function:..`
-# as a *relative path* inside the Function: drive, which yields a null name:
-#   "Cannot process argument because the value of argument name is null"
-# The defensive choice was the broken one. `-LiteralPath` would likely also
-# work, but there is no reason to prefer it over the plain declaration.
+# Plain declarations are required here: `Set-Item -Path 'Function:..'`
+# resolves `..` as a relative path inside the Function: drive and fails with
+# a null-name error.
 function ..   { Set-Location .. }
 function ...  { Set-Location ../.. }
 function .... { Set-Location ../../.. }
@@ -309,15 +325,16 @@ function cs {
 }
 
 # ─────────────────────────────────────────────────────────────
-#  Test-CliToolsSetup — the deterministic control for name collisions
+#  Test-CliToolsSetup — collision check for the names defined above
 #
-#  PowerShell resolves an alias before a function, so a function named
-#  after a built-in alias never runs and never errors. This walks the names
-#  this config defines and reports any that are shadowed, plus which tools
-#  are missing. Run it after editing this file, or set
-#  CLI_TOOLS_SELFCHECK=1 for one shell start.
+#  PowerShell resolves an alias before a function, so a function named after
+#  a built-in alias never runs and never errors. This reports any such name,
+#  plus which expected tools are missing. Run after editing this file, or set
+#  CLI_TOOLS_SELFCHECK=1 to have it run at shell start.
 # ─────────────────────────────────────────────────────────────
 function Test-CliToolsSetup {
+    [CmdletBinding()]
+    param()
     # Names this config defines as FUNCTIONS. Any of these resolving to an
     # alias means the function is unreachable.
     $ourFunctions = @(
@@ -327,14 +344,11 @@ function Test-CliToolsSetup {
         'scoopupd','scoopupg','scoopup','scoopin','scooprm','scoopse','scoopst'
     )
 
-    # Names this config defines as ALIASES, mapped to what they must point at.
-    # These are checked differently: the failure is not "it is an alias" but
-    # "it is an alias to something other than what we set".
-    #
-    # An earlier version omitted this table entirely and whitelisted the
-    # alias targets inside the function-collision test instead. That made the
-    # whitelist dead code and left g/lg/http/fm/tempty/fe/fkill/fif with no
-    # collision protection at all, while still printing "OK".
+    # Names this config defines as ALIASES, mapped to what they must resolve
+    # to. Checked against the target, not against being an alias: the failure
+    # mode here is "aliased to something other than what we set". Names
+    # missing from this table get no collision protection at all, so add to
+    # it whenever an alias is added above.
     $ourAliases = @{
         g = 'git'; lg = 'lazygit'; http = 'xh'; fm = 'yazi'; sudo = 'gsudo'
         tempty = 'Clear-RecycleBin'

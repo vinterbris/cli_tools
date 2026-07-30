@@ -4,71 +4,52 @@
 #
 #  Install: $PROFILE holds ONE line, written by bootstrap/install.ps1:
 #      . "<repo>\dotfiles\profile.ps1"
-#  No symlink, no copy. Symlinks need Developer Mode or admin on Windows,
-#  and PowerShell — unlike zsh, which insists on ~/.zshrc — lets the stub
-#  point anywhere. So the file in the repo IS the loaded config, and there
-#  is no sync step to forget.
+#  The file in the repo is the loaded config; there is no copy to sync.
 #
-#  Design rules carried over from shell_common:
+#  Design rules:
 #    - Core commands keep core behaviour. On Windows "core" includes the
-#      cmdlet aliases: ls, cat, gc, gcm, gl, gp, h are NOT touched.
-#    - Guarded everywhere. Every tool is wrapped in a resolve-or-skip, so
-#      this file works on a bare machine and lights up as you install.
-#    - Machine-local settings live in profile.local.ps1, untracked.
-#    - Config policy: the repo is the single source of truth, and tools are
-#      pointed at it with environment variables ($STARSHIP_CONFIG and
-#      friends). Nothing is copied into a tool's conventional location.
+#      cmdlet aliases: ls, cat, gc, gcm, gl, gp, h are not touched.
+#    - Every tool reference is guarded, so this works on a bare machine and
+#      lights up as tools are installed.
+#    - The repo is the single source of truth for config; tools are pointed
+#      at it with environment variables, never by copying files.
+#    - Machine-local settings go in profile.local.ps1, untracked, loaded last.
 #
-#  See dotfiles/README.md for load order and ../prd-powershell.md for the
-#  full Linux→PowerShell portability audit.
+#  Load order and the constraints behind it: dotfiles/README.md
+#  Design history, measurements and rejected options: ../prd-powershell.md
 # ─────────────────────────────────────────────────────────────
 
 # --- startup timing ---------------------------------------------
 # CLI_TOOLS_TIMING=1 prints cumulative milliseconds at each stage.
-# Exists because "the profile feels slow" is not actionable and guessing at
-# the cause is how you optimise the wrong line.
+# Write-CliTiming stays in the session after load — dot-sourcing offers no
+# private scope, so there is nowhere else for it to live.
 $CliSw = if ($env:CLI_TOOLS_TIMING) { [System.Diagnostics.Stopwatch]::StartNew() } else { $null }
-function Mark {
+function Write-CliTiming {
     param([string]$Label)
     if ($CliSw) { Write-Host ('{0,6} ms  {1}' -f $CliSw.ElapsedMilliseconds, $Label) -ForegroundColor DarkGray }
 }
 
 # --- locate the repo --------------------------------------------
-# $PSScriptRoot is <repo>\dotfiles. Nothing is hardcoded, so the repo can
-# be cloned anywhere. CLI_DOCS is the same override name shell_common uses.
+# $PSScriptRoot is <repo>\dotfiles, so the repo can be cloned anywhere.
+# CLI_DOCS is the same override name shell_common uses.
 $env:CLI_DOCS = Split-Path -Parent $PSScriptRoot
 
 # --- resolve real executable paths ------------------------------
-# WHY full paths and not bare names: fzf on Windows runs --preview and
-# FZF_*_COMMAND through cmd.exe (it ignores $SHELL — junegunn/fzf#1018,
-# #2638). PowerShell functions and aliases do not exist inside cmd.exe.
-# This is the Windows form of the shell_common trap: "aliases are invisible
-# to anything that shells out".
-#
-# The Scoop shims directory is tried first. Everything here comes from
-# Scoop, all its shims live in one folder, and a Test-Path against a known
-# location is far cheaper than Get-Command walking the whole PATH — six
-# probes cost 66 ms that way. No cache and no invalidation logic: the file
-# is either there or it is not.
+# Full paths, not bare names: fzf on Windows runs --preview and
+# FZF_*_COMMAND through cmd.exe and ignores $SHELL (junegunn/fzf#1018), and
+# PowerShell functions and aliases do not exist there. This is the Windows
+# form of the shell_common rule that aliases are invisible to anything that
+# shells out.
 #
 # Get-CliBin and the $*Bin variables land in the session scope because this
-# file is dot-sourced. functions.ps1 relies on that. Do not run this file as
-# a script (`& profile.ps1`) — dot-source it.
-$ScoopRoot  = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $HOME 'scoop' }
-$ScoopShims = Join-Path $ScoopRoot 'shims'
-
-# NOTE on cost: a HIT is a single Test-Path, effectively free. A MISS falls
-# through to Get-Command, which walks the entire PATH and finds nothing —
-# that is the expensive case. Measured: with carapace absent, "resolve
-# binaries" cost 100 ms; the misses are the reason, not the hits. So an
-# uninstalled tool is not free here.
+# file is dot-sourced; functions.ps1 depends on that. Dot-source this file,
+# do not run it as a script.
 function Get-CliBin {
+    [OutputType([string])]
     param([Parameter(Mandatory)][string]$Name)
-    $shim = Join-Path $ScoopShims "$Name.exe"
-    if (Test-Path -LiteralPath $shim) { return $shim }
-    $c = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue |
-         Select-Object -First 1
-    if ($c) { return $c.Source }
+    $cmd = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue |
+           Select-Object -First 1
+    if ($cmd) { return $cmd.Source }
     return $null
 }
 
@@ -80,61 +61,92 @@ $StarshipBin = Get-CliBin starship
 $ZoxideBin   = Get-CliBin zoxide
 $CarapaceBin = Get-CliBin carapace
 $AtuinBin    = Get-CliBin atuin
-Mark 'resolve binaries'
+Write-CliTiming 'resolve binaries'
 
 # --- init-script cache ------------------------------------------
-# starship, zoxide, carapace and atuin each generate their PowerShell init
-# by running the binary. Four process spawns per shell start, and measured
-# on this machine the config already costs 666 ms of the 847 ms total —
-# adding four more spawns would push a new tab past a second.
+# starship, zoxide, carapace and atuin each generate their PowerShell init by
+# running the binary. Four process spawns per shell start; measured at 666 ms
+# for the config before this existed. The generated script is cached and
+# dot-sourced instead.
 #
-# So the generated script is cached and dot-sourced instead. Staleness is
-# decided by comparing timestamps against the binary itself, so `scoop
-# update` invalidates it automatically. Set CLI_TOOLS_NO_CACHE=1 to bypass,
-# or run Clear-CliToolsCache.
-#
-# This is real machinery and it earns its place only because of the
-# measurement above. If the numbers had said 200 ms, it should not be here.
+# Staleness compares timestamps against the binary, so a Scoop update — which
+# rewrites the shim — invalidates the cache. CLI_TOOLS_NO_CACHE=1 bypasses it;
+# Clear-CliToolsCache removes it; Test-CliToolsCache reports on it.
 $CliCacheDir = Join-Path $env:LOCALAPPDATA 'cli_tools\cache'
 
 function Use-CachedInit {
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)][string]$Exe,
         [Parameter(Mandatory)][string[]]$InitArgs
     )
-    if ($env:CLI_TOOLS_NO_CACHE) {
-        Invoke-Expression ((& $Exe @InitArgs | Out-String)); return
+
+    # Empty output means a broken install or wrong arguments. Without this
+    # check the integration would simply be absent, with nothing said.
+    $generate = {
+        $text = (& $Exe @InitArgs | Out-String)
+        if (-not $text.Trim()) { throw "'$Exe $($InitArgs -join ' ')' produced no output" }
+        $text
     }
+
+    if ($env:CLI_TOOLS_NO_CACHE) {
+        try {
+            # Invoke-Expression is unavoidable here: the input is a local
+            # binary's own stdout, which is how these tools ship their init.
+            # PSScriptAnalyzer flags the call; the trust boundary is the
+            # binary, not user input.
+            Invoke-Expression (& $generate)
+        } catch {
+            Write-Warning "cli_tools: '$Name' init failed — $($_.Exception.Message)"
+        }
+        return
+    }
+
     $cache = Join-Path $CliCacheDir "$Name.ps1"
     $fresh = (Test-Path -LiteralPath $cache) -and
              ((Get-Item -LiteralPath $cache).LastWriteTimeUtc -ge (Get-Item -LiteralPath $Exe).LastWriteTimeUtc)
+
     if (-not $fresh) {
-        # Regeneration must be LOUD. If writing the cache fails, the previous
-        # version fell back to running the binary on every single start and
-        # said nothing — a silent permanent slowdown, which is the failure
-        # class this config keeps getting caught by.
+        $generated = $null
         try {
+            $generated = & $generate
             if (-not (Test-Path -LiteralPath $CliCacheDir)) {
                 New-Item -ItemType Directory -Path $CliCacheDir -Force -ErrorAction Stop | Out-Null
             }
-            $generated = (& $Exe @InitArgs | Out-String)
-            if (-not $generated.Trim()) { throw "$Exe $($InitArgs -join ' ') produced no output" }
             Set-Content -LiteralPath $cache -Value $generated -Encoding utf8 -ErrorAction Stop
-            if ($CliSw) { Mark "  (regenerated cache: $Name)" }
+            Write-CliTiming "  (regenerated cache: $Name)"
         } catch {
-            Write-Warning "cli_tools: cache for '$Name' could not be written, falling back to running the binary every start. $($_.Exception.Message)"
-            Invoke-Expression ((& $Exe @InitArgs | Out-String))
+            # A write failure must not become a permanent silent slowdown:
+            # without this warning the binary would be re-run on every start
+            # forever, and nothing would say so.
+            Write-Warning "cli_tools: cache for '$Name' not written, falling back to running the binary every start. $($_.Exception.Message)"
+            if ($generated) { Invoke-Expression $generated }
             return
         }
     }
     . $cache
 }
 
-# Diagnostic for the above. Answers "is the cache actually being used?"
-# rather than leaving it to inference from timing numbers.
+function Clear-CliToolsCache {
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
+    if (-not (Test-Path -LiteralPath $CliCacheDir)) { Write-Host 'nothing cached' -ForegroundColor DarkGray; return }
+    if ($PSCmdlet.ShouldProcess($CliCacheDir, 'Remove init cache')) {
+        Remove-Item -LiteralPath $CliCacheDir -Recurse -Force
+        Write-Host "cleared $CliCacheDir — restart the shell" -ForegroundColor Green
+    }
+}
+
+# Answers "is the cache actually being used", instead of leaving it to be
+# inferred from timing numbers.
 function Test-CliToolsCache {
-    if ($env:CLI_TOOLS_NO_CACHE) { Write-Host 'CLI_TOOLS_NO_CACHE is set — caching disabled' -ForegroundColor DarkYellow; return }
+    [CmdletBinding()]
+    param()
+    if ($env:CLI_TOOLS_NO_CACHE) {
+        Write-Host 'CLI_TOOLS_NO_CACHE is set — caching disabled' -ForegroundColor DarkYellow
+        return
+    }
     if (-not (Test-Path -LiteralPath $CliCacheDir)) {
         Write-Warning "cache directory does not exist: $CliCacheDir"
         Write-Host 'Every init is being regenerated on every shell start.' -ForegroundColor DarkYellow
@@ -144,8 +156,8 @@ function Test-CliToolsCache {
     foreach ($n in 'starship', 'zoxide', 'carapace', 'atuin') {
         $f = Join-Path $CliCacheDir "$n.ps1"
         if (-not (Test-Path -LiteralPath $f)) { Write-Host ('{0,-10} absent' -f $n) -ForegroundColor DarkYellow; continue }
-        $exe  = Get-CliBin $(if ($n -eq 'carapace') { 'carapace' } else { $n })
-        $item = Get-Item -LiteralPath $f
+        $exe   = Get-CliBin $n
+        $item  = Get-Item -LiteralPath $f
         $state = if (-not $exe) { 'no binary' }
                  elseif ($item.LastWriteTimeUtc -ge (Get-Item -LiteralPath $exe).LastWriteTimeUtc) { 'fresh' }
                  else { 'STALE — regenerates every start' }
@@ -153,56 +165,38 @@ function Test-CliToolsCache {
     }
 }
 
-function Clear-CliToolsCache {
-    if (Test-Path -LiteralPath $CliCacheDir) {
-        Remove-Item -LiteralPath $CliCacheDir -Recurse -Force
-        Write-Host "cleared $CliCacheDir — restart the shell" -ForegroundColor Green
-    } else {
-        Write-Host 'nothing cached' -ForegroundColor DarkGray
-    }
-}
-
 # --- editor -----------------------------------------------------
-# micro, same as the Linux config: modern keybindings (Ctrl+S saves,
-# Ctrl+Q quits), nothing modal to learn. notepad is the last resort so
-# $env:EDITOR is never empty on a machine with no tools installed.
+# micro, same as the Linux config: Ctrl+S saves, Ctrl+Q quits, nothing modal.
+# notepad last so $env:EDITOR is never empty on a bare machine.
 #
-# nvim is deliberately NOT in this chain. The old profile aliased vim→nvim,
-# but nvim is not installed and he does not use it — the alias was stale.
-#
-# A BARE NAME here, not the resolved path, unlike everywhere else in this
-# file. Reviewed and kept deliberately: EDITOR is consumed by programs that
-# hand it to a POSIX-ish shell — git's editor invocation being the obvious
-# one — where a Windows path full of backslashes gets mangled and a bare
-# name resolved through PATH does not. The full-path rule exists for strings
-# that reach cmd.exe, which this one does not.
+# A bare name here rather than a resolved path, unlike everything else in
+# this file: EDITOR is consumed by programs that hand it to a POSIX-ish shell
+# — git's editor invocation being the obvious one — where a Windows path full
+# of backslashes is mangled and a PATH-resolved name is not. The full-path
+# rule applies to strings that reach cmd.exe; this is not one.
 foreach ($e in 'micro', 'notepad') {
     if (Get-CliBin $e) { $env:EDITOR = $e; break }
 }
 $env:VISUAL = $env:EDITOR
 
 # --- bat --------------------------------------------------------
-# ansi theme = follow the terminal's own colours, same as Linux.
-# No MANPAGER: Windows has no man pages, help is Get-Help.
+# ansi theme follows the terminal's own colours. No MANPAGER: Windows has no
+# man pages, help is Get-Help.
 if ($BatBin -and -not $env:BAT_THEME) { $env:BAT_THEME = 'ansi' }
 
 # --- fzf environment --------------------------------------------
 # PSFzf honours FZF_DEFAULT_COMMAND, FZF_CTRL_T_COMMAND and
-# FZF_ALT_C_COMMAND (confirmed in the PSFzf README). It does NOT read
-# FZF_CTRL_T_OPTS / FZF_ALT_C_OPTS — those are fzf's shell-integration
-# variables and have no PowerShell equivalent. Per-widget preview options
-# therefore go into _PSFZF_FZF_DEFAULT_OPTS, assigned at the end of this
-# file.
+# FZF_ALT_C_COMMAND. It does not read FZF_CTRL_T_OPTS / FZF_ALT_C_OPTS —
+# those are fzf's shell-integration variables and have no PowerShell
+# equivalent, so preview options go into _PSFZF_FZF_DEFAULT_OPTS, assigned at
+# the end of this file.
 $FzfPreviewCmd = $null
 if ($FzfBin) {
     $env:FZF_DEFAULT_OPTS = '--height 60% --layout=reverse --border --info=inline'
 
-    # The Linux config uses `fd -tf -HI`. -I (no-ignore) is dropped here and
-    # AppData / node_modules are excluded, because on Windows Ctrl+T is
-    # frequently pressed in $HOME, where -HI means walking AppData — tens of
-    # thousands of files — before fzf shows anything. That is the reported
-    # "terminal froze". Hidden files are still included; only the two
-    # directories that are always large are not.
+    # The Linux config uses `fd -tf -HI`. -I is dropped and AppData excluded
+    # because Ctrl+T is often pressed in $HOME, where -HI means walking
+    # AppData: measured 3305 ms versus 235 ms with these exclusions.
     $FdExcludes = '--exclude .git --exclude AppData --exclude node_modules --exclude $Recycle.Bin'
     if ($FdBin) {
         $env:FZF_DEFAULT_COMMAND = "`"$FdBin`" -tf -H $FdExcludes"
@@ -210,20 +204,20 @@ if ($FzfBin) {
         $env:FZF_ALT_C_COMMAND   = "`"$FdBin`" -td -H $FdExcludes"
     }
 
-    # Preview pane. Ctrl+T yields files and Alt+C yields directories, but the
-    # options are shared between them, so the command has to branch.
-    # `if exist "X\"` is the cmd.exe directory test — the trailing backslash
-    # inside the quotes is what makes it directory-only.
+    # Ctrl+T yields files and Alt+C directories, but they share one set of
+    # options, so the preview command branches. `if exist "X\"` is the
+    # cmd.exe directory test; the trailing backslash is what makes it
+    # directory-only.
     #
-    # Quoting, from outside in:
+    # Quoting, outside in:
     #   1. fzf splits FZF_DEFAULT_OPTS into words honouring quotes, so the
-    #      whole preview command is wrapped in SINGLE quotes. Double quotes
-    #      there would be closed by the first inner quote.
-    #   2. On Windows fzf does NOT quote the {} substitution (fzf#1018), so
-    #      each {} is wrapped in double quotes here by hand.
+    #      command is wrapped in SINGLE quotes — double quotes would be
+    #      closed by the first inner quote.
+    #   2. fzf does not quote the {} substitution on Windows (fzf#1018), so
+    #      each {} is quoted here by hand.
     #
     # If the preview pane shows a cmd error, drop the branch and use
-    # $filePrev alone — one less thing to go wrong.
+    # $filePrev alone.
     if ($BatBin) {
         $filePrev = """$BatBin"" --color=always --style=numbers --line-range :200 ""{}"""
         $dirPrev  = if ($EzaBin) {
@@ -234,108 +228,90 @@ if ($FzfBin) {
         $FzfPreviewCmd = "if exist ""{}\"" ($dirPrev) else ($filePrev)"
     }
 }
-Mark 'fzf env'
+Write-CliTiming 'fzf env'
 
 # --- the alias / function layer ---------------------------------
 . (Join-Path $PSScriptRoot 'functions.ps1')
-Mark 'functions.ps1'
+Write-CliTiming 'functions.ps1'
 
 # --- PSReadLine -------------------------------------------------
 # Parity with zsh-autosuggestions (inline prediction) and
-# zsh-syntax-highlighting (PSReadLine colours it natively — no module).
-# Imported explicitly BEFORE PSFzf and carapace, both of which register key
-# handlers on it.
+# zsh-syntax-highlighting (PSReadLine colours natively — no module).
+# Imported before PSFzf and carapace, both of which register handlers on it.
 Import-Module PSReadLine -ErrorAction SilentlyContinue
 if (Get-Module PSReadLine) {
-    $psrl = (Get-Module PSReadLine).Version
-
     Set-PSReadLineOption -EditMode Windows
     Set-PSReadLineOption -HistoryNoDuplicates
     Set-PSReadLineOption -HistorySearchCursorMovesToEnd
     Set-PSReadLineOption -BellStyle None
 
-    # PredictionSource/View need PSReadLine 2.2+.
-    if ($psrl -ge [version]'2.2.0') {
+    if ((Get-Module PSReadLine).Version -ge [version]'2.2.0') {
         Set-PSReadLineOption -PredictionSource HistoryAndPlugin
         Set-PSReadLineOption -PredictionViewStyle ListView
     }
 
-    # Up/Down search history by the prefix already typed, which is what
-    # zsh's history-substring-search does.
+    # Search history by the prefix already typed — zsh's
+    # history-substring-search behaviour.
     Set-PSReadLineKeyHandler -Key UpArrow   -Function HistorySearchBackward
     Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
 }
-Mark 'PSReadLine'
+Write-CliTiming 'PSReadLine'
 
-# --- Terminal-Icons: REMOVED ------------------------------------
-# Measured at 348 ms of the 865 ms profile load — the single largest cost in
-# this file, by a wide margin, and it loads a format.ps1xml on every start.
-# What it bought: icons in native `ls` output. eza already gives icons under
-# `e`/`ll`/`la`, so this was decoration on the one listing command kept
-# native for pipeline reasons.
-#
-# Set CLI_TOOLS_ICONS=1 in profile.local.ps1 if you want it back knowing the
-# price.
+# --- Terminal-Icons: opt-in only --------------------------------
+# Measured at 348 ms of shell startup, the largest single cost in this file.
+# Set CLI_TOOLS_ICONS=1 in profile.local.ps1 to accept that price.
 if ($env:CLI_TOOLS_ICONS) {
     Import-Module Terminal-Icons -ErrorAction SilentlyContinue
-    Mark 'Terminal-Icons'
+    Write-CliTiming 'Terminal-Icons'
 }
 
 # --- prompt: starship, Pure preset ------------------------------
-# Same starship.toml as WSL — one file, no Windows fork. STARSHIP_CONFIG is
-# set explicitly rather than relying on ~/.config, so the repo stays the
-# single source of truth.
+# The same starship.toml as WSL. STARSHIP_CONFIG is set explicitly rather
+# than relying on ~/.config, so the repo stays the single source of truth.
 if ($StarshipBin) {
     $env:STARSHIP_CONFIG = Join-Path $PSScriptRoot 'starship.toml'
     Use-CachedInit -Name starship -Exe $StarshipBin -InitArgs @('init', 'powershell')
 }
-Mark 'starship init'
+Write-CliTiming 'starship init'
 
 # --- zoxide -----------------------------------------------------
-# Provides `z` and `zi`. Must come after the prompt init: zoxide hooks the
-# prompt function to record directories, and starship replaces it.
+# Provides `z` and `zi`. After the prompt init: zoxide hooks the prompt
+# function to record directories, and starship replaces it.
 if ($ZoxideBin) {
     Use-CachedInit -Name zoxide -Exe $ZoxideBin -InitArgs @('init', 'powershell')
 }
-Mark 'zoxide init'
+Write-CliTiming 'zoxide init'
 
 # --- carapace: argument completion ------------------------------
-# Completions for 1000+ commands. Without this, Tab does nothing useful for
-# rg, fd, scoop or fzf.
-#
-# MenuComplete on Tab is required by carapace, not a preference: the default
-# Complete function renders raw ANSI escapes instead of styled completions.
-# It is set AFTER Set-PSReadLineOption -EditMode above, because EditMode
-# resets key bindings and would undo it.
+# Completions for 1000+ commands. MenuComplete on Tab is required, not a
+# preference: the default Complete function renders raw ANSI escapes. It is
+# set after Set-PSReadLineOption -EditMode above, which resets key bindings.
 if ($CarapaceBin) {
     $env:CARAPACE_BRIDGES = 'zsh,fish,bash'
     Set-PSReadLineOption -Colors @{ 'Selection' = "`e[7m" }
     Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete
     Use-CachedInit -Name carapace -Exe $CarapaceBin -InitArgs @('_carapace')
 }
-Mark 'carapace'
+Write-CliTiming 'carapace'
 
 # --- atuin: shell history ---------------------------------------
-# Takes Ctrl+R. This mirrors the Linux load order rule — atuin after fzf, so
-# atuin keeps Ctrl+R — and it is why PSFzf below is told not to claim it.
-# Local-only until `atuin login`; no sync, no account, nothing leaves the
-# machine.
+# Takes Ctrl+R, mirroring the Linux load-order rule, which is why PSFzf
+# below is told not to claim it. Local only until `atuin login`.
 #
-# ATUIN_POWERSHELL_PROMPT_OFFSET exists because the search UI is drawn
-# relative to the prompt, and the Pure preset is two lines. If the prompt
-# jumps when Ctrl+R opens, set it to 1 in profile.local.ps1.
+# If the prompt jumps when the search UI opens, set
+# $env:ATUIN_POWERSHELL_PROMPT_OFFSET = 1 in profile.local.ps1 — the UI is
+# drawn relative to the prompt and the Pure preset is two lines.
 if ($AtuinBin) {
     Use-CachedInit -Name atuin -Exe $AtuinBin -InitArgs @('init', 'powershell')
 }
-Mark 'atuin'
+Write-CliTiming 'atuin'
 
-# --- PSFzf: Ctrl+T / Alt+C (and Ctrl+R only without atuin) -------
-# Alt+C is bound by default. Ctrl+R is NOT — PSFzf refuses to take it from
-# PSReadLine unless asked explicitly.
+# --- PSFzf: Ctrl+T / Alt+C, and Ctrl+R only without atuin --------
+# Alt+C is bound by default; Ctrl+R is not taken unless asked for.
 #
-# -EnableAlias* is deliberately NOT used. PSFzf's optional aliases include
-# `fd` (Invoke-FuzzySetLocation), which would shadow the fd binary, and
-# `ff`, `fe`, `fkill`, which collide with the names in functions.ps1.
+# -EnableAlias* is deliberately unused: PSFzf's optional aliases include
+# `fd` (Invoke-FuzzySetLocation), which would shadow the fd binary, plus
+# `ff`, `fe` and `fkill`, which collide with names in functions.ps1.
 if ($FzfBin) {
     Import-Module PSFzf -ErrorAction SilentlyContinue
     if (Get-Module PSFzf) {
@@ -346,9 +322,9 @@ if ($FzfBin) {
                             -PSReadlineChordReverseHistory 'Ctrl+r'
         }
 
-        # PSFzf's own implementations, under the shell_common names.
-        # Reusing them beats reimplementing: Invoke-PsFzfRipgrep already
-        # handles the rg/fzf plumbing that broke `fif` on Linux.
+        # PSFzf's own implementations under the shell_common names.
+        # Invoke-PsFzfRipgrep already handles the rg/fzf plumbing that `fif`
+        # gets wrong on Linux.
         Set-Alias fe    Invoke-FuzzyEdit        -Force
         Set-Alias fkill Invoke-FuzzyKillProcess -Force
         if (Get-Command Invoke-PsFzfRipgrep -ErrorAction SilentlyContinue) {
@@ -356,28 +332,26 @@ if ($FzfBin) {
         }
     }
 }
-Mark 'PSFzf'
+Write-CliTiming 'PSFzf'
 
 # --- machine-local overrides ------------------------------------
-# Loaded LAST so it can override anything above. This is the opposite of
-# the zsh order, where .zshrc.local must precede syntax highlighting;
-# PSReadLine colours are applied dynamically, so no such constraint exists.
+# Last, so it can override anything above. The opposite of the zsh order,
+# where .zshrc.local must precede syntax highlighting; PSReadLine applies
+# colours dynamically and has no such constraint.
 $localProfile = Join-Path $PSScriptRoot 'profile.local.ps1'
 if (Test-Path $localProfile) { . $localProfile }
 
 # --- derived from the final FZF_DEFAULT_OPTS ---------------------
-# Deliberately last. PSFzf reads this variable when a chord fires, not now,
-# so assigning it here means profile.local.ps1 can still change
-# FZF_DEFAULT_OPTS and have that reach the Ctrl+T / Alt+C preview.
+# After profile.local.ps1 on purpose: this embeds a copy of
+# FZF_DEFAULT_OPTS, and PSFzf reads the variable when a chord fires rather
+# than now, so a local override still reaches the preview.
 if ($FzfPreviewCmd) {
     $env:_PSFZF_FZF_DEFAULT_OPTS = "$($env:FZF_DEFAULT_OPTS) --preview '$FzfPreviewCmd'"
 }
-Mark 'total'
+Write-CliTiming 'total'
 
 # --- self-check --------------------------------------------------
-# Structural control, not a reminder: a function silently loses to an alias
-# of the same name in PowerShell's command precedence (Alias > Function >
-# Cmdlet > Application). Without this, adding a colliding name later fails
-# invisibly. Runs only when CLI_TOOLS_SELFCHECK is set, so shell start stays
-# fast.
+# A function silently loses to an alias of the same name in PowerShell's
+# command precedence, so a collision introduced later would fail invisibly.
+# CLI_TOOLS_SELFCHECK=1 runs the check at shell start.
 if ($env:CLI_TOOLS_SELFCHECK) { Test-CliToolsSetup }

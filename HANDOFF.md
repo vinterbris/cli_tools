@@ -28,7 +28,8 @@ A modern CLI environment for Sergey: tool selection, runnable shell config, and 
 
 ⚠️ **Two copies exist and they drift.**
 
-- `C:\Users\Vinterbris\_CLAUDE_DESKTOP_PROJECTS\cli_tools` — the repo, edited by Claude
+- `C:\Users\Vinterbris\cli_tools` — the Windows clone the PowerShell config loads from. `$PROFILE` points here
+- `C:\Users\Vinterbris\_CLAUDE_DESKTOP_PROJECTS\cli_tools` — the agent's working copy, kept deliberately
 - `~/cli_tools` inside WSL — the live copy, symlinked into `$HOME`
 
 Sync is manual:
