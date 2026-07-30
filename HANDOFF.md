@@ -4,7 +4,7 @@ tags: [handoff, state]
 
 # Handoff
 
-Snapshot of project state as of 2026-07-29. Point-in-time document — delete or rewrite when it stops matching reality. Everything durable lives in the other files; this one exists so the next session does not re-derive decisions or re-litigate settled trade-offs.
+Snapshot of project state as of 2026-07-30. Point-in-time document — delete or rewrite when it stops matching reality. Everything durable lives in the other files; this one exists so the next session does not re-derive decisions or re-litigate settled trade-offs.
 
 ---
 
@@ -20,25 +20,43 @@ A modern CLI environment for Sergey: tool selection, runnable shell config, and 
 
 **Deployed and working on WSL.** zsh + starship (Pure preset) + zsh-autosuggestions + zsh-syntax-highlighting + atuin + fzf + zoxide. Config symlinked from `~/cli_tools/dotfiles` into `$HOME`. `Ctrl-R` / `Ctrl-T` / `Alt-C` confirmed working by the user.
 
+**Deployed and working on Windows 11 / PowerShell 7.6.4** as of 2026-07-30. starship (same `starship.toml` as WSL) + zoxide + carapace + atuin + PSFzf + PSReadLine prediction, 23 tools from Scoop. `$PROFILE` is a one-line stub dot-sourcing `dotfiles/profile.ps1` from `C:\Users\Vinterbris\cli_tools`. Profile load ~380 ms, down from 847 ms at first working build. `Test-CliToolsSetup` reports OK.
+
+Two Windows chords are **deliberately unbound**: `Ctrl+T` and `Alt+C` corrupted the terminal display. Use `fe` and `zi` instead. Diagnosis in `prd-powershell.md`.
+
 **Not yet deployed:** laptop, server. `bootstrap/install.sh` is written and dry-run-tested but has never executed a real `sudo apt-get install` — only `--dry-run` and the dotfiles half.
 
 **Repo layout** is described in [README.md](README.md). Do not add files without checking the one-file-one-purpose split there.
 
-## The working copy problem
+## The working copies
 
-⚠️ **Two copies exist and they drift.**
+Three copies, and as of 2026-07-30 two of them are git clones of
+`https://github.com/vinterbris/cli_tools.git`.
 
-- `C:\Users\Vinterbris\cli_tools` — the Windows clone the PowerShell config loads from. `$PROFILE` points here
-- `C:\Users\Vinterbris\_CLAUDE_DESKTOP_PROJECTS\cli_tools` — the agent's working copy, kept deliberately
-- `~/cli_tools` inside WSL — the live copy, symlinked into `$HOME`
+| Copy | Role | Synced by |
+|---|---|---|
+| `C:\Users\Vinterbris\cli_tools` | what PowerShell loads; `$PROFILE` points here | git |
+| `C:\Users\Vinterbris\_CLAUDE_DESKTOP_PROJECTS\cli_tools` | the agent's working copy | git |
+| `~/cli_tools` inside WSL | the live copy, symlinked into `$HOME` | ⚠️ still a manual `cp -r` |
 
-Sync is manual:
+The agent's copy is registered as a local remote in the Windows clone, so changes travel
+without a GitHub round-trip:
 
-```bash
-cp -r /mnt/c/Users/Vinterbris/_CLAUDE_DESKTOP_PROJECTS/cli_tools/. ~/cli_tools/
+```powershell
+cd $HOME\cli_tools
+git pull agent main      # remote 'agent' → the _CLAUDE_DESKTOP_PROJECTS path
 ```
 
-The Linux copy is deliberate — `/mnt/c` is slow enough to lag every shell start, so symlinking rc files across the boundary was rejected. Not under git yet; that is the obvious fix and would make the drift visible.
+🔴 **The WSL copy is the last remaining drift.** Replacing it with a clone is now trivial
+and is the highest-value cleanup left:
+
+```bash
+# destructive — back up ~/cli_tools first if anything local lives there
+git clone https://github.com/vinterbris/cli_tools.git ~/cli_tools
+```
+
+A separate Linux copy is deliberate: `/mnt/c` is slow enough to lag every shell start, so
+symlinking rc files across the boundary was rejected.
 
 ---
 
@@ -90,8 +108,10 @@ Each of these cost real debugging time. They are the reason certain code looks t
 
 | Thread | Status |
 |---|---|
-| **Put the repo under git** | ✅ Done 2026-07-30, local only. Remote is `https://github.com/vinterbris/cli_tools.git`; **push has not happened** — no credentials available to the agent. The WSL copy is still a `cp -r`, not yet re-established as a clone |
-| **Run the PowerShell config** | Written 2026-07-30 (`dotfiles/profile.ps1`, `dotfiles/functions.ps1`, `bootstrap/install.ps1`), **never executed** — no PowerShell available in the agent's sandbox. Unverified items are listed in `prd-powershell.md` §8 |
+| **Put the repo under git** | ✅ Done and pushed 2026-07-30 to `https://github.com/vinterbris/cli_tools.git`. Commit authorship uses the GitHub noreply address — GitHub rejects pushes that would publish a private email (`GH007`) |
+| **Run the PowerShell config** | ✅ Deployed and working 2026-07-30. The agent cannot execute PowerShell, so every verification in this session was Sergey running a command and pasting output. Remaining unverified items: `prd-powershell.md` §8 |
+| **Replace the WSL copy with a clone** | 🔴 Not done. The last remaining drift; see "The working copies" above. Requires deleting `~/cli_tools`, so it needs an explicit go-ahead |
+| **`Ctrl+T` / `Alt+C` on Windows** | Worked around, not fixed. Both corrupt the terminal display; `fe` and `zi` replace them. Lead if anyone returns to it: `cs` invokes `fzf.exe` directly and works, so the fault is in PSFzf's PSReadLine handlers — look at `InvokePromptHack` |
 | **Deploy to Pop!\_OS 22.04 laptop** | Untried. Expect more tools to fall through to cargo (slow, compiles from source). `--install-managers` required unless rustup is present |
 | **Deploy to Debian 12 server** | Untried. Consider trimming `TOOLS` in `install.sh` — `yazi`, `micro`, `btop` are interactive and rarely wanted on an ssh-only box |
 | **`atuin sync` across machines** | Not set up. Needs an account. Note the privacy implication: every command from the laptop lands in the server's history and back |
@@ -113,6 +133,39 @@ Everything else in the docs was checked against `--help` output, upstream source
 
 ---
 
+## Lessons from the PowerShell session — read before optimising anything
+
+Five wrong conclusions were reached and retracted in one session, all the same shape:
+**reading a mechanism from numbers instead of from the thing itself.** Each retraction is
+recorded in `prd-powershell.md` rather than quietly edited away.
+
+1. `nvim` assumed installed because an alias referenced it. An alias is evidence someone
+   once intended to install something.
+2. "The scoop text-parse check is broken" — inferred from all 18 tools reporting "would
+   install", when in fact none were installed. Absence of a match is not a broken matcher.
+3. "The init cache doesn't work" — inferred from two timing numbers. It worked;
+   carapace's 960 ms was a cold first run.
+4. "starship's cost is `New-Module`" — its init has a second `Invoke-Native` that was
+   never looked for.
+5. "`resolve binaries` is irreducible command-discovery warm-up" — held for three rounds;
+   it was ~15 ms per probe.
+
+What actually worked: **look at the artefact.** One glance at a 135-byte cache file
+settled what two rounds of timing analysis got wrong.
+
+Procedural lessons worth keeping:
+
+- **Search first.** The literature was consulted only when Sergey asked whether it had
+  been. It contained a decisive fact — Steve Lee's `Initialize-Profile` technique does not
+  speed up *interactive* startup, because `prompt` runs before the first prompt is drawn.
+  Without checking, the next step would have been a full profile restructure for zero gain.
+- **Use `PSProfiler` / `Measure-Script`** for per-line attribution. Hand-rolled stage
+  timings found the big wins but were too coarse to explain them.
+- **Adversarial review by subagent earns its cost.** Two passes found two failures of the
+  class "a check that reports success without checking" — both in code written *as* a
+  check. Both passes also invented API surface that does not exist (`Set-PsFzfOption`
+  parameters, twice), so verify what a reviewer asserts before building on it.
+
 ## How he works — worth knowing
 
 - Wants a plan and sign-off before building. Interrogates vague proposals
@@ -124,10 +177,21 @@ Everything else in the docs was checked against `--help` output, upstream source
 
 ## Continuing
 
+Linux / WSL:
+
 ```bash
 cd ~/cli_tools
 cs -l                      # confirm the cheatsheet search works
 bootstrap/install.sh --dry-run
 ```
 
-Read [README.md](README.md) for the file layout, then [learning-plan.md](learning-plan.md) Phase 0 for the verification block.
+Windows:
+
+```powershell
+cd $HOME\cli_tools
+Test-CliToolsSetup         # name collisions + missing tools
+Test-CliToolsCache         # is the init cache being used
+cs -List                   # cheatsheet sections
+```
+
+Read [README.md](README.md) for the file layout, [cheatsheet.md](../cheatsheet.md#powershell--start-here) for the PowerShell differences, then [learning-plan.md](learning-plan.md) Phase 0 for the verification block. The PowerShell port's full audit, measurements and retractions are in [prd-powershell.md](prd-powershell.md).
