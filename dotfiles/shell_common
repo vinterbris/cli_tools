@@ -20,8 +20,13 @@ done
 unset _b
 [ -n "$HOMEBREW_PREFIX" ] && export HOMEBREW_PREFIX
 # cargo install → ~/.cargo/bin ; pip --user / pipx → ~/.local/bin
-# atuin's own installer uses ~/.atuin/bin
+# Vendor installers with their own prefix: atuin → ~/.atuin/bin,
+# opencode → ~/.opencode/bin. Both append an `export PATH=…` line to
+# whichever rc file exists at install time; that line is lost the moment
+# the rc file is replaced by a symlink into this repo. Own the PATH here
+# instead of relying on what an installer wrote.
 [ -d "$HOME/.atuin/bin" ] && PATH="$HOME/.atuin/bin:$PATH"
+[ -d "$HOME/.opencode/bin" ] && PATH="$HOME/.opencode/bin:$PATH"
 [ -d "$HOME/.cargo/bin" ] && PATH="$HOME/.cargo/bin:$PATH"
 [ -d "$HOME/.local/bin" ] && PATH="$HOME/.local/bin:$PATH"
 export PATH
