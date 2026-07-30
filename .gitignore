@@ -26,3 +26,7 @@ HANDOFF.md
 # The PowerShell port audit: working notes, not published material.
 # Distilled conclusions live in docs/powershell.md.
 prd-powershell.md
+
+# Agent operating rules: repo-specific invariants, autoloaded by the agent.
+# Local tooling config, not published material.
+CLAUDE.md
