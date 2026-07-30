@@ -4,9 +4,11 @@
   --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
   --r: 10px; --r-s: 6px;
   --sb: 268px; --toc: 230px;
-  /* --measure caps prose at a readable line length; tables and code blocks ignore it and
-     use the whole --content column, which is why the column may be far wider. */
-  --measure: 820px; --content-max: 1320px; --wrap-max: 1550px;
+  /* Wikipedia's model: one column group centred in the viewport, sidebar and TOC flush
+     against the content. Nothing breaks out of --content-max, so tables and prose share
+     one width and every rule and heading spans the same column. */
+  --content-max: 960px;
+  --app-max: calc(var(--sb) + var(--content-max) + var(--toc));
   --ease: cubic-bezier(.4,0,.2,1);
 }
 html[data-theme="dark"]{
@@ -44,7 +46,7 @@ a:hover{text-decoration:underline; text-underline-offset:3px}
 a.ext::after{content:"↗"; font-size:.75em; margin-left:.22em; opacity:.65; text-decoration:none}
 
 /* ─────────────────────────────  shell  ───────────────────────────── */
-.app{display:flex; min-height:100vh}
+.app{display:flex; min-height:100vh; max-width:var(--app-max); margin-inline:auto}
 
 .sidebar{
   width:var(--sb); flex:0 0 var(--sb); position:sticky; top:0; height:100vh;
@@ -109,10 +111,7 @@ kbd{
 .btn-search kbd{margin-left:auto}
 #menu-btn{display:none}
 
-.wrap{
-  display:flex;align-items:flex-start;gap:0;flex:1;
-  width:100%;max-width:var(--wrap-max);margin-inline:auto;   /* centre in the viewport */
-}
+.wrap{display:flex;align-items:flex-start;gap:0;flex:1}
 .content{flex:1 1 auto;min-width:0;padding:38px 40px 100px;max-width:var(--content-max)}
 .tocbar{
   width:var(--toc);flex:0 0 var(--toc);position:sticky;top:57px;
@@ -139,13 +138,6 @@ kbd{
 .page{display:none;animation:in .25s var(--ease)}
 .page.on{display:block}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-
-/* Prose keeps the readable measure. Tables and code blocks are the reason the column is
-   wider than the text — they stay at 100% and run past the right edge of the paragraphs. */
-.hero,
-.body>p,.body>ul,.body>ol,.body>dl,.body>h1,.body>h2,.body>h3,.body>h4,
-.body>blockquote,.body>hr{max-width:var(--measure)}
-.body>.tablewrap,.body>.codewrap{max-width:100%}
 
 .hero{margin-bottom:34px;padding-bottom:22px;border-bottom:1px solid var(--bd)}
 .hero-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
@@ -257,8 +249,6 @@ kbd{
 .empty{padding:26px 16px;text-align:center;color:var(--fg-faint);font-size:13.5px}
 
 /* ─────────────────────────────  responsive  ───────────────────────────── */
-/* On a very wide monitor let the tables take more; prose stays at --measure. */
-@media (min-width:2100px){ :root{--content-max:1500px; --wrap-max:1730px} }
 @media (max-width:1180px){ .tocbar{display:none} }
 @media (max-width:880px){
   .sidebar{position:fixed;left:0;top:0;transform:translateX(-100%);transition:transform .22s var(--ease);box-shadow:var(--shadow)}
@@ -280,8 +270,8 @@ kbd{
     --ac-soft:#eef7f3;--code-bg:#fafafa;--code-bd:#ddd}
   body{background:#fff!important;font-size:9.6pt;line-height:1.45}
   .sidebar,.topbar,.tocbar,.overlay,.copy,.scrim,.headerlink{display:none!important}
-  .wrap{max-width:none;margin:0}
-  .content,.hero,.body>*{max-width:none!important;padding-left:0;padding-right:0}
+  .app{max-width:none;margin:0}
+  .content{max-width:none;padding:0}
   .page{display:block!important;break-after:page;animation:none}
   .page:last-child{break-after:auto}
   .hero h1{font-size:20pt}
