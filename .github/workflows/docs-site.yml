@@ -1,12 +1,19 @@
 # Build docs/index.html and publish it to GitHub Pages.
 #
-# UNTESTED: written without a GitHub Actions runner available. Run it once via
-# the Actions tab ("Run workflow") before relying on the release trigger.
+# Live at https://vinterbris.github.io/cli_tools/ — first successful run 2026-07-30,
+# which reproduced the local build hash exactly (build ec2af0f5).
 #
-# One-time setup: Settings -> Pages -> Source: "GitHub Actions".
+# Setup already done: Settings -> Pages -> Source: "GitHub Actions".
 name: docs site
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'docs/*.md'
+      - 'tools/**'
+      - '.github/workflows/docs-site.yml'
   release:
     types: [published]
   workflow_dispatch:
