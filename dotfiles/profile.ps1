@@ -302,10 +302,11 @@ if ($env:CLI_TOOLS_ICONS) {
 # 135-byte stub that re-invokes starship at load time — caching the stub
 # still spawned the process on every start.
 #
-# Note this stage still costs ~82 ms against 105 before, so the stub was not
-# the whole story, and it is not script size either: carapace dot-sources
-# 57 KB in 36 ms. Unverified suspicion is a further spawn inside starship's
-# own init.
+# This stage still costs ~80 ms. Per-line profiling attributes it to parsing
+# and executing the cached script rather than to a spawn: `. $cache` across
+# all four tools is 97 ms, while the one spawn inside starship's init
+# (`prompt --continuation`) measures 26 ms. Not reducible without dropping
+# the tool.
 if ($StarshipBin) {
     $env:STARSHIP_CONFIG = Join-Path $PSScriptRoot 'starship.toml'
     Use-CachedInit -Name starship -Exe $StarshipBin -InitArgs @('init', 'powershell', '--print-full-init')

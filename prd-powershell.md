@@ -525,7 +525,40 @@ stage granularity, and that coarseness is precisely why three successive diagnos
 starship and cache costs were wrong.
 
 Ruled out as external factors `[RUN]`: `$env:PSModulePath` contains no OneDrive or UNC
-entries, so signed-module verification over a slow path is not in play.
+entries, so signed-module verification over a slow path is not in play. And
+`ModuleAnalysisCache-*`, `StartupProfileData-Interactive` and
+`StartupProfileData-NonInteractive` all exist and are current in
+`%LOCALAPPDATA%\Microsoft\PowerShell` — PowerShell's own profile-guided startup
+optimisation is already in effect, so there is nothing to repair there either.
+
+### PSProfiler, per-line attribution — no hidden hot spot
+
+`Measure-Script` run against `profile.ps1` `[RUN]`. Caveat that turned out to matter: it
+re-runs the profile *inside a warm session*, so `Import-Module PSReadLine` reported
+**1.7 ms** against its real ~80 ms. Only the relative ordering is meaningful.
+
+| Line | Time | Calls | What |
+|---|---|---|---|
+| `. $cache` | **96.7 ms** | 4 | dot-sourcing the four cached init scripts — the most expensive line in the file |
+| `Get-Command` inside `Get-CliBin` | **56.5 ms** | 20 | 2.8 ms per call warm, ~15 ms cold |
+| `. functions.ps1` | **46.4 ms** | 1 | parsing, plus the 12 probes inside it |
+| everything else | < 2 ms | | noise |
+
+Two conclusions.
+
+**There is no hidden hot spot.** The three cost centres — command probes, parsing the
+cached init scripts, module loads — are exactly what the stage timings already attributed.
+The tool confirmed the picture rather than changing it, which is the answer to "maybe it
+will find something".
+
+**It also closes the last open guess.** The 96.7 ms on `. $cache` means starship's cost is
+dominated by *parsing and executing* the cached scripts, not by the spawn. The spawn is
+real and measured at 26 ms, but it sits inside that figure alongside parsing four scripts
+including carapace's 57 KB. Nothing left to cut without dropping tools.
+
+Also worth noting for the next person: `PSProfiler` should have been used first. Stage
+timings were enough to find the big wins but too coarse to diagnose *why*, and that
+coarseness produced three wrong diagnoses in a row.
 
   ⚠️ **Retraction of the paragraph below.** It was written from two timing numbers and
   asserted a broken cache. Wrong, and the fourth over-inference of this kind in this
