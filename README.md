@@ -8,6 +8,8 @@ Modern command-line environment: tool selection, runnable config, and the materi
 
 One prompt, one tool set, one cheatsheet across three shells: **zsh**, **bash**, and **PowerShell 7**.
 
+📖 **[Read it as a site → vinterbris.github.io/cli_tools](https://vinterbris.github.io/cli_tools/)** — every document on one page, searchable with <kbd>Ctrl</kbd>+<kbd>K</kbd>.
+
 | Platform | Status | Shell | Prompt |
 |---|---|---|---|
 | Ubuntu 24.04 (WSL2) | deployed | zsh | starship, Pure preset |
@@ -53,6 +55,11 @@ cli_tools/
 └── tools/
     └── build-site.py      renders README + docs/ into a single docs/index.html
 ```
+
+`docs/index.html` is generated, untracked, and published to
+[GitHub Pages](https://vinterbris.github.io/cli_tools/) by
+[`.github/workflows/docs-site.yml`](.github/workflows/docs-site.yml) — rebuild it locally
+with `python3 tools/build-site.py`.
 
 Documentation lives in `docs/` and nowhere else; `dotfiles/` and `bootstrap/` hold files
 that run. Each document answers one question and links to the others rather than
