@@ -34,7 +34,11 @@ function show(pid, anchor, push) {
     if (location.hash !== h) history.pushState(null, '', h);
   }
   const el = anchor ? document.getElementById(anchor) : null;
-  if (el) { el.scrollIntoView({ block: 'start', behavior: 'auto' }); window.scrollBy(0, -8); }
+  // No manual offset here: html has scroll-behavior:smooth, so a scrollBy() on the next
+  // line becomes a second scroll request that retargets the in-flight animation to
+  // current-position minus 8 — i.e. the jump never happens. The gap under the sticky bar
+  // comes from scroll-margin-top on the headings instead.
+  if (el) { el.scrollIntoView({ block: 'start' }); }
   else { window.scrollTo(0, 0); }   // stale or lifted anchor: land at the top of the page
   spy();
 }
