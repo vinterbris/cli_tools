@@ -44,13 +44,66 @@ $env:CLI_DOCS = Split-Path -Parent $PSScriptRoot
 # Get-CliBin and the $*Bin variables land in the session scope because this
 # file is dot-sourced; functions.ps1 depends on that. Dot-source this file,
 # do not run it as a script.
+# One PATH enumeration serves all ~21 lookups in this file and functions.ps1.
+# Measured: the index builds in 22 ms over 771 executables, against 62 ms for
+# eight `Get-Command -CommandType Application` probes alone — so the cost was
+# per-probe after all, not command-discovery warm-up as previously assumed.
+#
+# PATH order is preserved by first-match-wins, and PATHEXT order decides
+# within a directory. That is the difference from the reverted Scoop-shims
+# shortcut, which jumped a privileged directory ahead of PATH.
+#
+# No cache file, so there is nothing to invalidate: the index is rebuilt every
+# shell start. A tool installed mid-session is not seen until the next shell,
+# which is already true of everything else here.
+$CliBinIndex = @{}   # @{} is case-insensitive, matching Windows semantics
+$CliBinRank  = @{}
+$extRank = 0
+foreach ($x in ($env:PATHEXT -split ';' | Where-Object { $_ })) {
+    $CliBinRank[$x.TrimStart('.')] = $extRank++
+}
+foreach ($dir in ($env:PATH -split ';')) {
+    $d = $dir.Trim('"')
+    if (-not $d -or -not [IO.Directory]::Exists($d)) { continue }
+    foreach ($f in [IO.Directory]::EnumerateFiles($d)) {
+        $ext = [IO.Path]::GetExtension($f).TrimStart('.')
+        if (-not $CliBinRank.ContainsKey($ext)) { continue }
+        $n = [IO.Path]::GetFileNameWithoutExtension($f)
+        if (-not $CliBinIndex.ContainsKey($n)) {
+            $CliBinIndex[$n] = @{ Path = $f; Rank = $CliBinRank[$ext] }
+        } elseif ($CliBinIndex[$n].Rank -gt $CliBinRank[$ext]) {
+            # Same directory, better PATHEXT precedence (.exe before .cmd).
+            $CliBinIndex[$n] = @{ Path = $f; Rank = $CliBinRank[$ext] }
+        }
+    }
+}
+Remove-Variable extRank, CliBinRank
+
+# Applications only, by design. functions.ps1 deliberately uses Get-Command
+# for `scoop`, whose entry point may be a .ps1 rather than an application.
 function Get-CliBin {
     [OutputType([string])]
     param([Parameter(Mandatory)][string]$Name)
-    $cmd = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue |
-           Select-Object -First 1
-    if ($cmd) { return $cmd.Source }
+    if ($CliBinIndex.ContainsKey($Name)) { return $CliBinIndex[$Name].Path }
     return $null
+}
+
+# Cross-check against Get-Command. Run by hand after changing anything about
+# PATH handling; not machinery in the startup path.
+function Test-CliBinIndex {
+    [CmdletBinding()]
+    param()
+    $names = 'fzf','zoxide','starship','bat','fd','rg','eza','jq','procs','dust','duf',
+             'xh','lazygit','yazi','micro','btm','tldr','carapace','gsudo','atuin',
+             'hyperfine','ouch','glow','notepad'
+    $bad = foreach ($n in $names) {
+        $a = Get-CliBin $n
+        $b = (Get-Command $n -CommandType Application -ErrorAction SilentlyContinue |
+              Select-Object -First 1).Source
+        if ($a -ne $b) { [pscustomobject]@{ Name = $n; Index = $a; GetCommand = $b } }
+    }
+    if ($bad) { Write-Warning 'index disagrees with Get-Command:'; $bad | Format-Table -AutoSize | Out-String | Write-Host }
+    else { Write-Host "index agrees with Get-Command on all $($names.Count) names" -ForegroundColor Green }
 }
 
 $FdBin       = Get-CliBin fd
@@ -203,9 +256,11 @@ $FzfPreviewCmd = $null
 if ($FzfBin) {
     $env:FZF_DEFAULT_OPTS = '--height 60% --layout=reverse --border --info=inline'
 
-    # The Linux config uses `fd -tf -HI`. -I is dropped and AppData excluded
-    # because Ctrl+T is often pressed in $HOME, where -HI means walking
-    # AppData: measured 3305 ms versus 235 ms with these exclusions.
+    # -I dropped and AppData excluded relative to the Linux config: in $HOME,
+    # `fd -tf -HI` measured 3305 ms against 235 ms with these exclusions,
+    # because -HI means walking AppData. FZF_CTRL_T_COMMAND and
+    # FZF_ALT_C_COMMAND are still exported even though those chords are
+    # unbound — `fe` and any future direct fzf use pick them up.
     $FdExcludes = '--exclude .git --exclude AppData --exclude node_modules --exclude $Recycle.Bin'
     if ($FdBin) {
         $env:FZF_DEFAULT_COMMAND = "`"$FdBin`" -tf -H $FdExcludes"
@@ -326,20 +381,28 @@ if ($AtuinBin) {
 }
 Write-CliTiming 'atuin'
 
-# --- PSFzf, deferred to first use --------------------------------
-# Importing PSFzf costs ~150 ms: it loads PSFzf.dll, walks PSModulePath for
-# PSReadLine, does a wildcard PATH scan for fzf, and spawns `fzf --version`.
-# None of that is needed until a chord is pressed or one of the three
-# functions is called, so stubs pay it on first use instead of every start.
+# --- PSFzf, deferred, and Ctrl+T / Alt+C deliberately unbound ----
+# Importing PSFzf costs ~150 ms — PSFzf.dll, a PSModulePath walk, a wildcard
+# PATH scan for fzf, and a `fzf --version` spawn — none of which is needed
+# until something actually uses it. So stubs pay it on first use.
 #
-# The stubs call PSFzf's own exported handlers directly and stay bound
-# permanently — no attempt to hand the chord over after import. That avoids
-# depending on PSFzf's rebinding behaviour: it skips any chord already bound,
-# so a handover would need -Override, and the parameters for the Alt+C and
-# Alt+A chords do not exist in Set-PsFzfOption at all.
+# CTRL+T AND ALT+C ARE NOT BOUND. Both corrupted the terminal display on this
+# machine: Ctrl+T drew an empty picker and typing into it garbled the screen,
+# Alt+C did the same. Plain fzf is fine — `cs` runs it directly and works — so
+# the fault is in PSFzf's PSReadLine handlers redrawing the prompt, not fzf.
+# Rather than ship two keys that break the shell, they are left alone.
 #
-# Alt+A (history arguments) is bound by PSFzf's own import and is easy to
-# lose here, so it gets a stub too.
+# The functionality is available without them:
+#   Alt+C  → `zi`   zoxide's interactive directory picker
+#   Ctrl+T → `fe`   pick a file and open it in $EDITOR
+#
+# Alt+A works correctly and is kept. It is bound by PSFzf's own import, so it
+# would have disappeared silently without a stub of its own.
+#
+# The stubs call PSFzf's exported handlers directly and stay bound rather than
+# handing the chord over after import: PSFzf skips any chord already bound, so
+# a handover would need -Override, and Set-PsFzfOption has no parameter for
+# the Alt+A chord at all.
 #
 # -EnableAlias* remains unused: PSFzf's optional aliases include `fd`
 # (Invoke-FuzzySetLocation), which would shadow the fd binary, plus `ff`,
@@ -349,26 +412,16 @@ if ($FzfBin) {
         if (Get-Module PSFzf) { return $true }
         Import-Module PSFzf -ErrorAction SilentlyContinue
         if (Get-Module PSFzf) { return $true }
-        # Loud, because the alternative is a dead key with no explanation.
-        Write-Host 'cli_tools: PSFzf failed to import — Ctrl+T, Alt+C, Alt+A, fe, fkill and fif are unavailable' -ForegroundColor Red
+        # Loud: the alternative is a dead key with no explanation.
+        Write-Host 'cli_tools: PSFzf failed to import — Alt+A, fe, fkill and fif are unavailable' -ForegroundColor Red
         return $false
     }
 
-    Set-PSReadLineKeyHandler -Key 'Ctrl+t' -BriefDescription 'PSFzf provider (deferred)' `
-        -ScriptBlock { if (Import-PsFzfNow) { Invoke-FzfPsReadlineHandlerProvider } }
-    Set-PSReadLineKeyHandler -Key 'Alt+c' -BriefDescription 'PSFzf set location (deferred)' `
-        -ScriptBlock { if (Import-PsFzfNow) { Invoke-FzfPsReadlineHandlerSetLocation } }
     Set-PSReadLineKeyHandler -Key 'Alt+a' -BriefDescription 'PSFzf history args (deferred)' `
         -ScriptBlock { if (Import-PsFzfNow) { Invoke-FzfPsReadlineHandlerHistoryArgs } }
 
-    # Ctrl+R belongs to atuin when it is installed.
-    if (-not $AtuinBin) {
-        Set-PSReadLineKeyHandler -Key 'Ctrl+r' -BriefDescription 'PSFzf history (deferred)' `
-            -ScriptBlock { if (Import-PsFzfNow) { Invoke-FzfPsReadlineHandlerHistory } }
-    }
-
     # Functions, not aliases: an alias cannot trigger the import, and these
-    # names must work when typed before any chord has been pressed.
+    # names must work the first time they are typed.
     function fe    { if (Import-PsFzfNow) { Invoke-FuzzyEdit        @args } }
     function fkill { if (Import-PsFzfNow) { Invoke-FuzzyKillProcess @args } }
     function fif   { if (Import-PsFzfNow) { Invoke-PsFzfRipgrep     @args } }

@@ -413,9 +413,8 @@ Three rules explain every rename:
 | Key | Does | From |
 |---|---|---|
 | `Ctrl-R` | search history — fuzzy, with cwd and exit code | atuin |
-| `Ctrl-T` | pick a file, insert its path into the line | PSFzf |
-| `Alt-C` | pick a directory and cd into it | PSFzf |
 | `Tab` | menu completion for 1000+ commands' flags | carapace |
+| `Alt-A` | pick an argument from history, insert it | PSFzf |
 | `↑` / `↓` | history search by what you already typed | PSReadLine |
 | `→` | accept the greyed-out suggestion | PSReadLine |
 | `Ctrl-A` / `Ctrl-E` | start / end of line | PSReadLine |
@@ -426,6 +425,16 @@ Inside fzf: `Tab` multi-select · `Ctrl-J/K` move · `Ctrl-/` toggle preview · 
 
 Try `Tab` after typing `rg --` — that is carapace, and it is the thing you had none of
 before.
+
+**`Ctrl-T` and `Alt-C` are deliberately not bound on Windows.** PSFzf's PSReadLine
+handlers corrupt the terminal display here — an empty picker, and garbled output when you
+type into it. Plain fzf is fine (`cs` uses it directly), so the fault is in the handlers'
+prompt redraw, not in fzf. Use these instead:
+
+| Instead of | Use | Does |
+|---|---|---|
+| `Alt-C` | `zi` | zoxide's interactive directory picker |
+| `Ctrl-T` | `fe` | pick a file, open it in `$EDITOR` |
 
 ### PowerShell — names that differ from Linux
 
@@ -460,7 +469,10 @@ fda secret                 # include hidden and gitignored files  (fd -HI)
 rgh TODO                   # ripgrep everything: hidden, binary, ignored
 rgf                        # list every file rg would search
 
-fe                         # pick a file, open it in $EDITOR (micro)
+fe                         # pick a file from a list, open it in $EDITOR (micro)
+                           #   this is the replacement for Ctrl+T
+zi                         # pick a directory you have visited before, cd there
+                           #   this is the replacement for Alt+C
 fif TODO                   # pick a MATCH inside files, open at that line
 fkill                      # pick a process, kill it
 pg chrome                  # process grep; pcpu / pmem sort by cpu / memory
@@ -490,6 +502,7 @@ download from voidtools.
 ```powershell
 Test-CliToolsSetup         # name collisions + which tools are missing
 Test-CliToolsCache         # is the init cache actually being used
+Test-CliBinIndex           # does the PATH index agree with Get-Command
 Clear-CliToolsCache        # wipe it, then restart the shell
 
 $env:CLI_TOOLS_TIMING=1; pwsh -NoLogo -Command exit    # per-stage startup cost

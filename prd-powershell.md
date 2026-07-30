@@ -414,11 +414,32 @@ it would have vanished silently under a naive deferral.
 - **`OnIdle` pre-warming, merged cache files, NGen/ReadyToRun, `$PSDefaultParameterValues`**
   — no saving, or unobservable correctness.
 
-**Pending measurement, not built:** replacing ~21 `Get-Command` probes with a single
-PATH index (40–90 ms if PowerShell-side, 0 if the cost is the OS populating its
-filesystem metadata cache), and inlining starship's continuation prompt into the cached
-init (~20–25 ms, but it adds a dependency on `starship.toml`'s mtime to the freshness
-check).
+**Measured, 386 ms after the deferral** `[RUN]`. Then the two open questions were settled:
+
+| Measurement | Result | Decision |
+|---|---|---|
+| PATH index build | **22 ms** over 771 executables | **Built.** Against 62 ms for eight `Get-Command` probes alone, plus ~12 more probes inside `functions.ps1`. So the cost was per-probe, not command-discovery warm-up — an assumption held for three rounds and now falsified |
+| `starship prompt --continuation` spawn | **26 ms** | **Not built.** It requires regex surgery on a third-party generated script plus a new `starship.toml` mtime dependency in the freshness check. 26 ms does not buy that; the machinery/payoff rule says no |
+
+### Ctrl+T and Alt+C removed
+
+Both corrupted the terminal display: `Ctrl+T` drew an empty picker and typing into it
+garbled the screen; `Alt+C` did the same. Sergey's call to drop them, and the right one.
+
+The diagnostic distinction worth recording: **plain fzf is fine.** `cs` invokes `fzf.exe`
+directly and works, so the fault is in PSFzf's PSReadLine handlers redrawing the prompt —
+plausibly its `InvokePromptHack` against Windows Terminal and a two-line Pure prompt —
+not in fzf, not in the `FZF_*` environment, and not in the deferral.
+
+Nothing is actually lost, which is why this was cheap to accept:
+
+| Was | Now |
+|---|---|
+| `Alt+C` | `zi` — zoxide's interactive picker |
+| `Ctrl+T` | `fe` — pick a file, open in `$EDITOR` |
+
+`Alt+A` works correctly and is kept. `FZF_CTRL_T_COMMAND` and `FZF_ALT_C_COMMAND` are
+still exported: `fe` and any direct fzf use consume them.
 
 ### Startup budget — replacing the invented target
 
