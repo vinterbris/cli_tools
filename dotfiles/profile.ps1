@@ -273,11 +273,14 @@ if ($env:CLI_TOOLS_ICONS) {
 # --- prompt: starship, Pure preset ------------------------------
 # The same starship.toml as WSL. STARSHIP_CONFIG is set explicitly rather
 # than relying on ~/.config, so the repo stays the single source of truth.
-# --print-full-init is required for caching to achieve anything. Plain
-# `starship init powershell` emits a 135-byte STUB that re-invokes starship
-# with --print-full-init at load time, so caching the stub still spawned the
-# process on every start — measured 105 ms, indistinguishable from no cache.
-# --print-full-init emits the real script, which caches usefully.
+# --print-full-init, because plain `starship init powershell` emits a
+# 135-byte stub that re-invokes starship at load time — caching the stub
+# still spawned the process on every start.
+#
+# Note this stage still costs ~82 ms against 105 before, so the stub was not
+# the whole story, and it is not script size either: carapace dot-sources
+# 57 KB in 36 ms. Unverified suspicion is a further spawn inside starship's
+# own init.
 if ($StarshipBin) {
     $env:STARSHIP_CONFIG = Join-Path $PSScriptRoot 'starship.toml'
     Use-CachedInit -Name starship -Exe $StarshipBin -InitArgs @('init', 'powershell', '--print-full-init')

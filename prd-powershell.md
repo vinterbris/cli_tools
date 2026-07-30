@@ -28,7 +28,9 @@ existing Windows↔WSL drift.
 
 Binary, checkable on the machine:
 
-1. `pwsh` starts in **< 400 ms** with the full profile loaded (`Measure-Command`).
+1. ~~`pwsh` starts in **< 400 ms** with the full profile loaded.~~ Invented without a
+   baseline; replaced by a measured budget in §8. Actual: ~810 ms total, 549 ms of it
+   the profile's own stages, and the remainder is module loading and script parsing.
 2. `Ctrl-T` inserts a fuzzy-picked path; `Ctrl-R` fuzzy-searches PSReadLine history;
    `Alt-C` changes directory. All three with a `bat`/`eza` preview pane.
 3. `z <partial>` jumps; `zi` opens the interactive picker.
@@ -342,9 +344,48 @@ here is a review-level claim, not a tested one.
   was keyed on `$Name` alone, so a change to `$InitArgs` would not have invalidated it.
   The invocation is now written as the cache file's first line and compared.
 
-  Worth noting as the argument for `Test-CliToolsCache` existing: two rounds of
-  reasoning from timing numbers alone got this wrong, and one glance at a file size
-  settled it.
+  ⚠️ **The fix worked and the prediction did not.** The cache file is now 10797 bytes of
+  real init, but starship's stage cost **82 ms**, against 105 ms before and a predicted
+  ~10 ms. Total went 560 → 549 ms `[RUN]`. So the stub explained the file size but was
+  not the whole cost.
+
+  And size is not the driver either: carapace dot-sources **57784 bytes in 36 ms** while
+  starship's 10797 bytes take 82. Remaining hypothesis, **unverified**: starship's init
+  script itself spawns the binary again — for a session key or similar — which no amount
+  of caching removes. Settled by reading the cached file for process invocations.
+
+  Worth keeping as the argument for `Test-CliToolsCache`: reasoning from timing numbers
+  alone got this wrong twice, and one file size settled the mechanism. It also shows the
+  limit of that method — a correct mechanism fix bought 10 ms.
+
+### Startup budget — replacing the invented target
+
+The 400 ms in success criterion 1 was made up without a baseline and should not be
+treated as a goal. Measured instead `[RUN]`:
+
+| | ms |
+|---|---|
+| bare `pwsh -NoProfile` | 181 |
+| profile, own stages | 549 |
+| full shell start, reported | ~810 |
+
+Where it goes, and whether it is reducible:
+
+| Stage | ms | Reducible? |
+|---|---|---|
+| resolve binaries | 72 | No. Mostly command-discovery warm-up, not the eight probes — the Scoop shim shortcut proved that by saving only ~20 ms at the cost of PATH correctness |
+| functions.ps1 | 60 | Only by writing less code |
+| PSReadLine | 87 | No. Module load pwsh would do anyway |
+| starship | 82 | Unclear — see above |
+| zoxide | 14 | Already cached |
+| carapace | 36 | Already cached |
+| atuin | 46 | Already cached |
+| PSFzf | 143 | Only by deferring key-handler registration to the first keypress, which is real machinery for ~140 ms |
+
+**Position: stop here.** Everything cheap has been taken. What remains is module loading
+and script parsing, and the only lever left — lazy-loading PSFzf — is more mechanism than
+the problem justifies. Revisit only if the shell start becomes annoying in practice
+rather than in a table.
 
   ⚠️ **Retraction of the paragraph below.** It was written from two timing numbers and
   asserted a broken cache. Wrong, and the fourth over-inference of this kind in this
