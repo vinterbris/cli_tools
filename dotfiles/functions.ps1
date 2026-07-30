@@ -341,7 +341,9 @@ function Test-CliToolsSetup {
         'e','ll','la','lt','ltt','ltg','lsize','lnew','b','bp','rgh','rgf',
         'ff','fdd','fda','dsz','dus','pg','ptree','pcpu','pmem','jqc','jqr',
         'tp','tl','path','cs','..','...','....','mdv','esf','esr',
-        'scoopupd','scoopupg','scoopup','scoopin','scooprm','scoopse','scoopst'
+        'scoopupd','scoopupg','scoopup','scoopin','scooprm','scoopse','scoopst',
+        # defined in profile.ps1 as deferred wrappers around PSFzf
+        'fe','fkill','fif'
     )
 
     # Names this config defines as ALIASES, mapped to what they must resolve
@@ -352,8 +354,6 @@ function Test-CliToolsSetup {
     $ourAliases = @{
         g = 'git'; lg = 'lazygit'; http = 'xh'; fm = 'yazi'; sudo = 'gsudo'
         tempty = 'Clear-RecycleBin'
-        fe = 'Invoke-FuzzyEdit'; fkill = 'Invoke-FuzzyKillProcess'
-        fif = 'Invoke-PsFzfRipgrep'
     }
 
     $problems = @(

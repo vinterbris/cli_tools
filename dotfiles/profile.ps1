@@ -106,11 +106,15 @@ function Use-CachedInit {
     # The cache is keyed on $Name alone, so a change to $InitArgs would not
     # invalidate it. The invocation is therefore recorded as the first line
     # and compared: a different command line counts as stale.
+    # [IO.File] rather than cmdlets: same three checks, but four cmdlet
+    # invocations per tool — one of them opening a pipeline — becomes three
+    # static calls. Exists() must stay first: GetLastWriteTimeUtc returns
+    # 1601-01-01 for a missing file instead of throwing.
     $cache  = Join-Path $CliCacheDir "$Name.ps1"
     $header = "# cli_tools: $Exe $($InitArgs -join ' ')"
-    $fresh  = (Test-Path -LiteralPath $cache) -and
-              ((Get-Item -LiteralPath $cache).LastWriteTimeUtc -ge (Get-Item -LiteralPath $Exe).LastWriteTimeUtc) -and
-              ((Get-Content -LiteralPath $cache -TotalCount 1) -eq $header)
+    $fresh  = [IO.File]::Exists($cache) -and
+              ([IO.File]::GetLastWriteTimeUtc($cache) -ge [IO.File]::GetLastWriteTimeUtc($Exe)) -and
+              ((& { $r = [IO.StreamReader]::new($cache); try { $r.ReadLine() } finally { $r.Dispose() } }) -eq $header)
 
     if (-not $fresh) {
         $generated = $null
@@ -245,11 +249,14 @@ Write-CliTiming 'functions.ps1'
 # Imported before PSFzf and carapace, both of which register handlers on it.
 Import-Module PSReadLine -ErrorAction SilentlyContinue
 if (Get-Module PSReadLine) {
-    Set-PSReadLineOption -EditMode Windows
-    Set-PSReadLineOption -HistoryNoDuplicates
-    Set-PSReadLineOption -HistorySearchCursorMovesToEnd
-    Set-PSReadLineOption -BellStyle None
+    # One call, not four. -EditMode Windows is already the Windows default;
+    # it is stated because it resets key bindings, which is what forces
+    # carapace's Tab handler to be set after this point.
+    Set-PSReadLineOption -EditMode Windows -HistoryNoDuplicates `
+                         -HistorySearchCursorMovesToEnd -BellStyle None
 
+    # Kept separate on purpose: merged in, an older PSReadLine rejecting these
+    # two would discard every option above as well.
     if ((Get-Module PSReadLine).Version -ge [version]'2.2.0') {
         Set-PSReadLineOption -PredictionSource HistoryAndPlugin
         Set-PSReadLineOption -PredictionViewStyle ListView
@@ -319,33 +326,54 @@ if ($AtuinBin) {
 }
 Write-CliTiming 'atuin'
 
-# --- PSFzf: Ctrl+T / Alt+C, and Ctrl+R only without atuin --------
-# Alt+C is bound by default; Ctrl+R is not taken unless asked for.
+# --- PSFzf, deferred to first use --------------------------------
+# Importing PSFzf costs ~150 ms: it loads PSFzf.dll, walks PSModulePath for
+# PSReadLine, does a wildcard PATH scan for fzf, and spawns `fzf --version`.
+# None of that is needed until a chord is pressed or one of the three
+# functions is called, so stubs pay it on first use instead of every start.
 #
-# -EnableAlias* is deliberately unused: PSFzf's optional aliases include
-# `fd` (Invoke-FuzzySetLocation), which would shadow the fd binary, plus
-# `ff`, `fe` and `fkill`, which collide with names in functions.ps1.
+# The stubs call PSFzf's own exported handlers directly and stay bound
+# permanently — no attempt to hand the chord over after import. That avoids
+# depending on PSFzf's rebinding behaviour: it skips any chord already bound,
+# so a handover would need -Override, and the parameters for the Alt+C and
+# Alt+A chords do not exist in Set-PsFzfOption at all.
+#
+# Alt+A (history arguments) is bound by PSFzf's own import and is easy to
+# lose here, so it gets a stub too.
+#
+# -EnableAlias* remains unused: PSFzf's optional aliases include `fd`
+# (Invoke-FuzzySetLocation), which would shadow the fd binary, plus `ff`,
+# `fe` and `fkill`, which collide with names in functions.ps1.
 if ($FzfBin) {
-    Import-Module PSFzf -ErrorAction SilentlyContinue
-    if (Get-Module PSFzf) {
-        if ($AtuinBin) {
-            Set-PsFzfOption -PSReadlineChordProvider 'Ctrl+t'
-        } else {
-            Set-PsFzfOption -PSReadlineChordProvider 'Ctrl+t' `
-                            -PSReadlineChordReverseHistory 'Ctrl+r'
-        }
-
-        # PSFzf's own implementations under the shell_common names.
-        # Invoke-PsFzfRipgrep already handles the rg/fzf plumbing that `fif`
-        # gets wrong on Linux.
-        Set-Alias fe    Invoke-FuzzyEdit        -Force
-        Set-Alias fkill Invoke-FuzzyKillProcess -Force
-        if (Get-Command Invoke-PsFzfRipgrep -ErrorAction SilentlyContinue) {
-            Set-Alias fif Invoke-PsFzfRipgrep -Force
-        }
+    function Import-PsFzfNow {
+        if (Get-Module PSFzf) { return $true }
+        Import-Module PSFzf -ErrorAction SilentlyContinue
+        if (Get-Module PSFzf) { return $true }
+        # Loud, because the alternative is a dead key with no explanation.
+        Write-Host 'cli_tools: PSFzf failed to import — Ctrl+T, Alt+C, Alt+A, fe, fkill and fif are unavailable' -ForegroundColor Red
+        return $false
     }
+
+    Set-PSReadLineKeyHandler -Key 'Ctrl+t' -BriefDescription 'PSFzf provider (deferred)' `
+        -ScriptBlock { if (Import-PsFzfNow) { Invoke-FzfPsReadlineHandlerProvider } }
+    Set-PSReadLineKeyHandler -Key 'Alt+c' -BriefDescription 'PSFzf set location (deferred)' `
+        -ScriptBlock { if (Import-PsFzfNow) { Invoke-FzfPsReadlineHandlerSetLocation } }
+    Set-PSReadLineKeyHandler -Key 'Alt+a' -BriefDescription 'PSFzf history args (deferred)' `
+        -ScriptBlock { if (Import-PsFzfNow) { Invoke-FzfPsReadlineHandlerHistoryArgs } }
+
+    # Ctrl+R belongs to atuin when it is installed.
+    if (-not $AtuinBin) {
+        Set-PSReadLineKeyHandler -Key 'Ctrl+r' -BriefDescription 'PSFzf history (deferred)' `
+            -ScriptBlock { if (Import-PsFzfNow) { Invoke-FzfPsReadlineHandlerHistory } }
+    }
+
+    # Functions, not aliases: an alias cannot trigger the import, and these
+    # names must work when typed before any chord has been pressed.
+    function fe    { if (Import-PsFzfNow) { Invoke-FuzzyEdit        @args } }
+    function fkill { if (Import-PsFzfNow) { Invoke-FuzzyKillProcess @args } }
+    function fif   { if (Import-PsFzfNow) { Invoke-PsFzfRipgrep     @args } }
 }
-Write-CliTiming 'PSFzf'
+Write-CliTiming 'PSFzf (deferred)'
 
 # --- machine-local overrides ------------------------------------
 # Last, so it can override anything above. The opposite of the zsh order,

@@ -358,6 +358,68 @@ here is a review-level claim, not a tested one.
   alone got this wrong twice, and one file size settled the mechanism. It also shows the
   limit of that method — a correct mechanism fix bought 10 ms.
 
+### Startup optimisation, third round — escalated to a stronger reviewer
+
+Two of its findings corrected claims made above, from upstream source rather than from
+timing inference:
+
+- **starship's cost is a process spawn, not `New-Module`.** Its init has a *second*
+  `Invoke-Native` at module-body level — `Set-PSReadLineOption -ContinuationPrompt
+  (Invoke-Native … "prompt" "--continuation")` — so the cached script still spawns
+  `starship.exe` through the Scoop shim on every start. The `New-Module` theory was mine
+  and was unverified.
+- **`functions.ps1`'s 65 ms is probably 12 more command-discovery probes, not parse
+  cost.** `Get-CliBin` is called for `rg`, `dust`, `procs`, `git`, `lazygit`, `jq`, `xh`,
+  `gsudo`, `es`, `yazi`, `glow`, plus `Get-Command scoop`. The "resolve binaries" line in
+  the table below undercounts the real total by roughly half.
+
+It also invented two `Set-PsFzfOption` parameters — `-PSReadlineChordSetLocation` and
+`-PSReadlineChordReverseHistoryArgs` — which do not exist. Checked against the module's
+own docs before building on them; the design changed as a result.
+
+**Shipped:**
+
+| Change | Saving |
+|---|---|
+| PSFzf deferred behind PSReadLine chord stubs and wrapper functions | ~145 ms expected |
+| `[IO.File]` static calls instead of cmdlets in the cache freshness check | 8–15 ms, guess |
+| One `Set-PSReadLineOption` call instead of four | 3–8 ms, guess |
+
+The deferral binds `Ctrl+T`, `Alt+C`, `Alt+A` — and `Ctrl+R` only when atuin is absent —
+to stubs that import PSFzf on first press and then call its exported handlers
+(`Invoke-FzfPsReadlineHandler*`, confirmed public) directly. The stubs stay bound rather
+than handing the chord over, which avoids depending on PSFzf's override behaviour
+entirely. `fe`/`fkill`/`fif` become functions, since an alias cannot trigger an import;
+they moved from `$ourAliases` to `$ourFunctions` in the self-check in the same commit,
+because forgetting that would have made the check report a false collision.
+
+`Alt+A` (history arguments) is bound by PSFzf's import and was never documented here —
+it would have vanished silently under a naive deferral.
+
+**Rejected, with reasons worth keeping:**
+
+- **Deferring carapace (41 ms)** — `Register-ArgumentCompleter` must be in effect before
+  the first completion, and `Tab` is the most-pressed key in the shell. Real machinery
+  for 41 ms.
+- **Deferring atuin (47 ms)** — atuin *records* history via hooks installed at init.
+  Deferring to the first `Ctrl+R` means commands run before that press are never
+  recorded: silent, permanent data loss.
+- **Dropping `Import-Module PSReadLine`** — the 83 ms proves it is not yet loaded when
+  the profile runs, so the cost is paid either way. Removing the explicit import would
+  make `if (Get-Module PSReadLine)` false and skip all six options and both key handlers
+  in silence.
+- **Hoisting starship's `New-Module` body into the caller's scope** — the body ends with
+  `Export-ModuleMember`, which throws outside a module. It also leaks `Get-Cwd` and
+  `Invoke-Native` into the session.
+- **`OnIdle` pre-warming, merged cache files, NGen/ReadyToRun, `$PSDefaultParameterValues`**
+  — no saving, or unobservable correctness.
+
+**Pending measurement, not built:** replacing ~21 `Get-Command` probes with a single
+PATH index (40–90 ms if PowerShell-side, 0 if the cost is the OS populating its
+filesystem metadata cache), and inlining starship's continuation prompt into the cached
+init (~20–25 ms, but it adds a dependency on `starship.toml`'s mtime to the freshness
+check).
+
 ### Startup budget — replacing the invented target
 
 The 400 ms in success criterion 1 was made up without a baseline and should not be
