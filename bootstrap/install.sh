@@ -358,5 +358,5 @@ Next:
   atuin import auto        pull existing history into atuin (once)
   ./install.sh --dry-run   see what a re-run would change
 
-Docs: cheatsheet.md · usecases.md · learning-plan.md
+Docs: docs/cheatsheet.md · docs/usecases.md · docs/learning-plan.md
 EOF

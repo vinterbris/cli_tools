@@ -20,11 +20,11 @@ One prompt, one tool set, one cheatsheet across three shells: **zsh**, **bash**,
 | If you want to | Read |
 |---|---|
 | Set up a new Linux machine | [bootstrap/INSTALL.md](bootstrap/INSTALL.md) |
-| Set up Windows / PowerShell | [prd-powershell.md](prd-powershell.md), then `bootstrap/install.ps1 -DryRun` |
-| Look up a command or flag | [cheatsheet.md](cheatsheet.md) — or type `cs <term>` |
-| Solve a specific task | [usecases.md](usecases.md) |
-| Learn this systematically | [learning-plan.md](learning-plan.md) |
-| Know why these tools | [modern-cli-tools.md](modern-cli-tools.md) |
+| Set up Windows / PowerShell | [docs/powershell.md](docs/powershell.md), then `bootstrap/install.ps1 -DryRun` |
+| Look up a command or flag | [docs/cheatsheet.md](docs/cheatsheet.md) — or type `cs <term>` |
+| Solve a specific task | [docs/usecases.md](docs/usecases.md) |
+| Learn this systematically | [docs/learning-plan.md](docs/learning-plan.md) |
+| Know why these tools | [docs/modern-cli-tools.md](docs/modern-cli-tools.md) |
 | Change the config | [dotfiles/README.md](dotfiles/README.md) |
 
 ## Layout
@@ -32,11 +32,12 @@ One prompt, one tool set, one cheatsheet across three shells: **zsh**, **bash**,
 ```
 cli_tools/
 ├── README.md              this index
-├── modern-cli-tools.md    why this set — rationale, tier list, counter-arguments
-├── cheatsheet.md          what to type — dense, print-oriented
-├── usecases.md            how to solve a task — ordered by frequency
-├── learning-plan.md       how to absorb it — phases, not weeks
-├── prd-powershell.md      the PowerShell port: audit, decisions, open items
+├── docs/
+│   ├── modern-cli-tools.md  why this set — rationale, tier list, counter-arguments
+│   ├── cheatsheet.md        what to type — dense, print-oriented
+│   ├── usecases.md          how to solve a task — ordered by frequency
+│   ├── learning-plan.md     how to absorb it — phases, not weeks
+│   └── powershell.md        the Windows half: constraints, decisions, startup cost
 ├── dotfiles/              runnable config
 │   ├── shell_common       aliases, exports, functions (bash + zsh)
 │   ├── zshrc              zsh init
@@ -76,7 +77,7 @@ git clone https://github.com/vinterbris/cli_tools.git $HOME\cli_tools
 
 Applied throughout, and the reason the config looks the way it does:
 
-- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed` do what a pasted script or `man` example expects. New tools get new names. Three sanctioned exceptions on Linux: `rm -I`, `df`→`duf`, `grep`→`ug`. **Zero on Windows** — see [dotfiles/README.md](dotfiles/README.md#powershell-specific) for why each one loses its justification there.
+- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed` do what a pasted script or `man` example expects. New tools get new names. Three sanctioned exceptions on Linux: `rm -I`, `df`→`duf`, and `grep`→`ug` — which accepts GNU grep's flags but not its output ordering or path prefixes, so scripts should call `\grep`. **Zero on Windows** — see [dotfiles/README.md](dotfiles/README.md#powershell-specific) for why each one loses its justification there.
 - **No framework.** oh-my-zsh replaced by two `source` lines. Nothing is loaded that you cannot point at.
 - **Guarded everywhere.** Every tool reference is wrapped in `command -v`, so the config works on a bare machine and lights up as you install.
 - **Machine-local settings never touch tracked files** — `~/.zshrc.local` and `~/.bashrc.local` are sourced at the end.

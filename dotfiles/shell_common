@@ -8,7 +8,8 @@
 #  behaviour. Exceptions are safe ones only —
 #    rm -I   same binary, added flag
 #    df→duf  read-only
-#    grep→ug flag-compatible with GNU grep
+#    grep→ug accepts GNU grep's flags — see the search section
+#            for the two output differences that remain
 # ─────────────────────────────────────────────────────────────
 
 # --- PATH -------------------------------------------------------
@@ -84,10 +85,20 @@ if command -v bat >/dev/null || command -v batcat >/dev/null; then
 fi
 
 # --- search -----------------------------------------------------
-# rg keeps its own name. ug IS GNU-grep-flag-compatible, so aliasing
-# is safe. No-op until ugrep is installed. Bypass with \grep.
+# rg keeps its own name. ug accepts GNU grep's flags, so aliasing is
+# safe for interactive use. No-op until ugrep is installed. Bypass
+# with \grep.
+#
+# Measured against GNU grep 3.7 with ugrep 3.7.2 — 29 invocations,
+# identical behaviour on every flag tested, with two exceptions:
+#   * ugrep searches in parallel, so `ug -r` output order varies run
+#     to run. `--sort` below pins it; without it, `grep -r … | head`
+#     is not reproducible. This is why the flag is here.
+#   * `ug -r x .` prints `a.txt:x` where grep prints `./a.txt:x`.
+#     Not fixable by a flag. Scripts that consume those paths should
+#     call \grep.
 if command -v ug >/dev/null; then
-  alias grep='ug --color=auto'
+  alias grep='ug --color=auto --sort'
 else
   alias grep='grep --color=auto'      # stock Ubuntu behaviour
   alias egrep='grep -E --color=auto'
@@ -236,12 +247,13 @@ fkill() {
 }
 
 # Locate the docs directory by following the ~/.shell_common symlink back
-# to the repo. Override with CLI_DOCS if the layout differs.
+# to <repo>/dotfiles, then up to <repo>/docs. Override with CLI_DOCS if the
+# layout differs.
 _cli_docs() {
   if [ -n "${CLI_DOCS:-}" ]; then printf '%s' "$CLI_DOCS"; return; fi
   local sc
   sc=$(readlink -f "$HOME/.shell_common" 2>/dev/null) || return 1
-  printf '%s' "$(dirname "$(dirname "$sc")")"
+  printf '%s' "$(dirname "$(dirname "$sc")")/docs"
 }
 
 # cs [term] — fuzzy-search cheatsheet.md by section, print the match.

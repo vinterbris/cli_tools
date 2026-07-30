@@ -6,7 +6,7 @@ tags: [cli, reference, cheatsheet]
 
 Dense reference. What to type, not why — the reasoning is in [modern-cli-tools.md](modern-cli-tools.md), task-shaped recipes are in [usecases.md](usecases.md).
 
-Aliases below come from [`dotfiles/shell_common`](dotfiles/shell_common). Search this file from the shell with `cs <term>`.
+Aliases below come from [`dotfiles/shell_common`](../dotfiles/shell_common). Search this file from the shell with `cs <term>`.
 
 **On PowerShell, jump to [PowerShell — start here](#powershell--start-here).** The tools are the same; a dozen names are not, and that section is the whole difference.
 
@@ -36,7 +36,7 @@ Aliases below come from [`dotfiles/shell_common`](dotfiles/shell_common). Search
 | `ff` | `fd -tf` — files only |
 | `fdd` | `fd -td` — dirs only |
 | `fda` | `fd -HI` — hidden + gitignored |
-| `grep` | `grep --color=auto` (or `ug` if installed) |
+| `grep` | `grep --color=auto`, or `ug --color=auto --sort` if ugrep is installed |
 | `egrep` / `fgrep` | `grep -E` / `grep -F`, coloured |
 | `fd` / `bat` | → `fdfind` / `batcat` on Debian & Ubuntu, only if the real binary is absent |
 
@@ -50,7 +50,7 @@ Aliases below come from [`dotfiles/shell_common`](dotfiles/shell_common). Search
 | `ncdu` | `gdu` — interactive, delete inside |
 | `top` | `btop` |
 | `pg` | `procs` — process grep |
-| `ptree` / `pcpu` / `pmem` | `procs --tree` / `--sortd cpu` / `--sortd mem` |
+| `ptree` / `pcpu` / `pmem` | `procs --tree` / `--sortd cpu` / `--sortd mem` — tree and sort are mutually exclusive |
 
 ## Aliases — git
 
@@ -238,9 +238,9 @@ gdu keys: `d` delete · `r` rescan · `n`/`s`/`c` sort by name/size/count
 ## procs
 
 ```bash
-procs nginx        # search by name/pid/user/port
+procs nginx        # search by name/pid/user
 procs --tree
-procs --sortd cpu
+procs --sortd cpu  # cannot be combined with --tree
 procs --watch
 ```
 
@@ -397,8 +397,8 @@ unalias rm        # for the session
 
 Everything above is zsh/bash. On Windows the tools are the same, several **names are
 not**. This section is the whole difference; config is
-[`dotfiles/profile.ps1`](dotfiles/profile.ps1) and
-[`dotfiles/functions.ps1`](dotfiles/functions.ps1).
+[`dotfiles/profile.ps1`](../dotfiles/profile.ps1) and
+[`dotfiles/functions.ps1`](../dotfiles/functions.ps1).
 
 Three rules explain every rename:
 

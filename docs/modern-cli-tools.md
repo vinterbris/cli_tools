@@ -46,7 +46,16 @@ rg --files | rg conf      # list files, then filter
 rg 'old' -l | xargs sed -i 's/old/new/g'
 ```
 
-**Alternative — `ugrep` (`ug`):** roughly comparable speed, but it is **flag-compatible with GNU grep**. That is the one real argument for it: you can `alias grep='ug'` and nothing breaks, including scripts and `man` examples. Benchmarks are contested — ugrep's own numbers favour ugrep, ripgrep's test suite favours ripgrep. Both are fast enough. Pick `ugrep` if compatibility matters more than ecosystem; pick `ripgrep` if you want the larger toolchain integration (editors, fzf recipes, `delta`).
+**Alternative — `ugrep` (`ug`):** roughly comparable speed, and it **accepts GNU grep's flags**, which is the one real argument for it. Measured, not assumed: 29 GNU-grep invocations run through both binaries (ugrep 3.7.2 vs GNU grep 3.7) behaved identically on every flag tested — `-i -n -c -l -v -w -x -o -r -E -F -q -A -B -C -e -s -h -H -m -P --include --exclude --color`.
+
+Two differences survive, and they are why `alias grep='ug'` is safe interactively but not in scripts:
+
+- **Output order is not stable.** ugrep searches in parallel; three identical `ug -r` runs gave two different orderings. `grep -r … | head` is therefore not reproducible. `--sort` fixes it, and the alias in `dotfiles/shell_common` sets it.
+- **`-r` drops the `./` prefix.** `grep -r x .` prints `./a.txt:x`; `ug -r x .` prints `a.txt:x`. No flag restores it. Anything consuming those paths should call `\grep`.
+
+Minor: `-L` returned a different exit code, and diagnostics read `ugrep: warning: …` rather than `grep: …`.
+
+Benchmarks are contested — ugrep's own numbers favour ugrep, ripgrep's test suite favours ripgrep. Both are fast enough. Pick `ugrep` if flag familiarity matters more than ecosystem; pick `ripgrep` if you want the larger toolchain integration (editors, fzf recipes, `delta`).
 
 ### fd — replaces `find`
 
@@ -76,7 +85,7 @@ git branch | fzf | xargs git switch
 kill -9 "$(ps -ef | fzf | awk '{print $2}')"
 ```
 
-Bindings (after sourcing fzf's keybindings — see [`dotfiles/`](dotfiles/)):
+Bindings (after sourcing fzf's keybindings — see [`dotfiles/`](../dotfiles/)):
 
 - `Ctrl-R` — fuzzy search shell history
 - `Ctrl-T` — insert file path into current command
@@ -107,7 +116,7 @@ export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 
 **Why:** git status column, tree mode built in, better defaults for human sizes and grouping. Actively maintained successor to **exa**, which is deprecated and unmaintained — do not install `exa`.
 
-Nerd Font is installed, so `--icons` is on in the [`dotfiles/`](dotfiles/) aliases. Icons are the fastest gain here — file type is readable before you parse the name.
+Nerd Font is installed, so `--icons` is on in the [`dotfiles/`](../dotfiles/) aliases. Icons are the fastest gain here — file type is readable before you parse the name.
 
 ```bash
 eza -lh --git --icons                # long + git status + icons
@@ -166,7 +175,7 @@ gdu -d /home     # show disk usage of devices
 ```bash
 dust                # tree of cwd by size
 dust -d 2 /var      # limit depth
-dust -r             # reverse (largest last)
+dust -r             # upside down: biggest at the top
 ```
 
 ### duf — replaces `df`, **not** `du`
@@ -182,7 +191,7 @@ duf --sort size
 
 ### procs — replaces `ps`
 
-**Why:** human-readable columns, built-in tree, search without `grep`, shows TCP/UDP ports per process. `ps aux | grep foo` becomes `procs foo`.
+**Why:** human-readable columns, built-in tree, search without `grep`. `ps aux | grep foo` becomes `procs foo`. TCP/UDP port columns exist but are not in the default column set — they need a config entry.
 
 ```bash
 procs nginx        # search by name/pid/user
@@ -190,6 +199,9 @@ procs --tree
 procs --sortd cpu  # descending; --sorta = ascending
 procs --watch      # live refresh
 ```
+
+`--sortd` and `--sorta` are declared `conflicts_with` `--tree` upstream, so a
+sorted tree is not available — pick one.
 
 ---
 
@@ -347,7 +359,7 @@ default=<yourname>
 [ -z "$ZSH_VERSION" ] && [ -t 1 ] && exec zsh
 ```
 
-**Keeping both shells in sync:** put every alias and export in a single POSIX-compatible file and source it from both rc files. Shell-specific lines (`fzf --bash` vs `fzf --zsh`, `zoxide init bash` vs `zsh`) stay in their own rc file. [`dotfiles/`](dotfiles/) is built that way.
+**Keeping both shells in sync:** put every alias and export in a single POSIX-compatible file and source it from both rc files. Shell-specific lines (`fzf --bash` vs `fzf --zsh`, `zoxide init bash` vs `zsh`) stay in their own rc file. [`dotfiles/`](../dotfiles/) is built that way.
 
 **`starship`** — cross-shell prompt, single TOML config, identical in bash and zsh. With a Nerd Font installed it renders the full icon set. Safe, low-commitment.
 
@@ -424,7 +436,7 @@ curl -sS https://webi.sh/<tool> | sh                              # single binar
 
 ## Shell setup
 
-The config is not embedded here — it lives as runnable files in [`dotfiles/`](dotfiles/), symlinked into `$HOME`. See [`dotfiles/README.md`](dotfiles/README.md) for install, load-order rules, `delta` git config, and the design rules the aliases follow.
+The config is not embedded here — it lives as runnable files in [`dotfiles/`](../dotfiles/), symlinked into `$HOME`. See [`dotfiles/README.md`](../dotfiles/README.md) for install, load-order rules, `delta` git config, and the design rules the aliases follow.
 
 | File | Installed as | Contents |
 |---|---|---|

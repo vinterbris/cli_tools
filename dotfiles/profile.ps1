@@ -16,7 +16,7 @@
 #    - Machine-local settings go in profile.local.ps1, untracked, loaded last.
 #
 #  Load order and the constraints behind it: dotfiles/README.md
-#  Design history, measurements and rejected options: ../prd-powershell.md
+#  Design history, constraints and rejected options: ../docs/powershell.md
 # ─────────────────────────────────────────────────────────────
 
 # --- startup timing ---------------------------------------------
@@ -29,10 +29,10 @@ function Write-CliTiming {
     if ($CliSw) { Write-Host ('{0,6} ms  {1}' -f $CliSw.ElapsedMilliseconds, $Label) -ForegroundColor DarkGray }
 }
 
-# --- locate the repo --------------------------------------------
+# --- locate the docs --------------------------------------------
 # $PSScriptRoot is <repo>\dotfiles, so the repo can be cloned anywhere.
-# CLI_DOCS is the same override name shell_common uses.
-$env:CLI_DOCS = Split-Path -Parent $PSScriptRoot
+# CLI_DOCS points at <repo>\docs — the same override name shell_common uses.
+$env:CLI_DOCS = Join-Path (Split-Path -Parent $PSScriptRoot) 'docs'
 
 # --- resolve real executable paths ------------------------------
 # Full paths, not bare names: fzf on Windows runs --preview and

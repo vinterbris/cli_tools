@@ -1,6 +1,6 @@
 # dotfiles
 
-Runnable shell config. This directory is the config itself, not documentation of it — rationale is in [`../modern-cli-tools.md`](../modern-cli-tools.md), commands in [`../cheatsheet.md`](../cheatsheet.md), automated install in [`../bootstrap/`](../bootstrap/INSTALL.md).
+Runnable shell config. This directory is the config itself, not documentation of it — rationale is in [`../modern-cli-tools.md`](../docs/modern-cli-tools.md), commands in [`../cheatsheet.md`](../docs/cheatsheet.md), automated install in [`../bootstrap/`](../bootstrap/INSTALL.md).
 
 | File | Goes to | Purpose |
 |---|---|---|
@@ -50,7 +50,7 @@ Put machine-specific `PATH` entries, work credentials, and per-host toolchain ex
 
 ## Dependencies
 
-Neither rc file hard-fails on a missing tool — every line is guarded by `command -v`. Install order and per-tool install commands are in [`../modern-cli-tools.md`](../modern-cli-tools.md#installation).
+Neither rc file hard-fails on a missing tool — every line is guarded by `command -v`. Install order and per-tool install commands are in [`../modern-cli-tools.md`](../docs/modern-cli-tools.md#installation).
 
 Zsh plugins are not vendored:
 
@@ -97,7 +97,8 @@ Do not enable PSFzf's optional aliases (`-EnableAlias*`): one of them is `fd`, w
 ## Design rules
 
 - **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed`, `ls`(-ish) do what a pasted script or `man` example expects. New tools get new names.
-- Three sanctioned exceptions: `rm -I` (same binary, added flag), `df`→`duf` (read-only), `grep`→`ug` (flag-compatible with GNU grep, and a no-op until ugrep is installed).
+- Three sanctioned exceptions: `rm -I` (same binary, added flag), `df`→`duf` (read-only), `grep`→`ug` (a no-op until ugrep is installed).
+- **The `grep`→`ug` exception is narrower than "compatible".** ugrep accepts GNU grep's flags — 29 invocations were diffed against GNU grep 3.7 and behaved identically — but two output differences survive. It searches in parallel, so `-r` output order varies between runs; the alias adds `--sort` to pin it. And `ug -r x .` prints `a.txt:x` where grep prints `./a.txt:x`, which no flag fixes. Anything that consumes those paths should call `\grep`.
 - **Startup forks are budgeted, not banned.** `brew --prefix` is replaced by a directory probe that sets `$HOMEBREW_PREFIX`. Two forks are kept deliberately: `dircolors` (its `LS_COLORS` drives zsh completion colouring) and `lesspipe`. Everything else is pure shell.
 - **No framework.** oh-my-zsh was removed: ~60 files sourced at startup, and its plugin layer obscures what is actually loaded.
 - **Aliases are invisible to anything that shells out.** fzf runs `FZF_DEFAULT_COMMAND` through `sh`, where `fd`→`fdfind` doesn't exist. `shell_common` resolves real paths into `$FD_BIN` / `$BAT_BIN` before defining aliases, and every subshell-bound setting uses those.

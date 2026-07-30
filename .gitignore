@@ -18,3 +18,7 @@ archive/
 # Working notes for the next session: local scratch, not part of the published
 # repo. Keep it, do not publish it.
 HANDOFF.md
+
+# The PowerShell port audit: working notes, not published material.
+# Distilled conclusions live in docs/powershell.md.
+prd-powershell.md
