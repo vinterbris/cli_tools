@@ -1,0 +1,59 @@
+# herdr — terminal workspace manager config
+# Install: ln -sf <repo>/dotfiles/herdr.toml ~/.config/herdr/config.toml
+
+onboarding = false
+[ui]
+agent_panel_sort = "spaces"
+
+show_agent_labels_on_pane_borders = true
+status_indicators = "symbols"
+[theme]
+name = "terminal"
+auto_switch = false
+
+[ui.sound]
+enabled = false
+
+[ui.toast]
+delivery = "off"
+
+# Cyrillic-layout aliases for default letter bindings. Windows Terminal via
+# WSL2 reports the layout character (not the physical key) for bare letters.
+# Russian ЙЦУКЕН <=> QWERTY. Upstream: herdrdev/herdr#2505, closed as feature-req; discussion: herdrdev/herdr#2507.
+[keys]
+help = ["prefix+?", "prefix+shift+,"]
+settings = ["prefix+s", "prefix+ы"]
+new_workspace = ["prefix+shift+n", "prefix+shift+Т"]
+new_worktree = ["prefix+shift+g", "prefix+shift+П"]
+rename_workspace = ["prefix+shift+w", "prefix+shift+Ц"]
+close_workspace = ["prefix+shift+d", "prefix+shift+В"]
+workspace_picker = ["prefix+w", "prefix+ц"]
+goto = ["prefix+g", "prefix+п"]
+navigate_pane_left = ["h", "р"]
+navigate_pane_down = ["j", "о"]
+navigate_pane_up = ["k", "л"]
+navigate_pane_right = ["l", "д"]
+detach = ["prefix+q", "prefix+й"]
+reload_config = ["prefix+shift+r", "prefix+shift+К"]
+open_notification_target = ["prefix+o", "prefix+щ"]
+new_tab = ["prefix+c", "prefix+с"]
+rename_tab = ["prefix+shift+t", "prefix+shift+Е"]
+previous_tab = ["prefix+p", "prefix+з"]
+next_tab = ["prefix+n", "prefix+т"]
+close_tab = ["prefix+shift+x", "prefix+shift+Ч"]
+rename_pane = ["prefix+shift+p", "prefix+shift+З"]
+edit_scrollback = ["prefix+e", "prefix+у"]
+copy_mode = ["prefix+[", "prefix+х"]
+focus_pane_left = ["prefix+h", "prefix+р"]
+focus_pane_down = ["prefix+j", "prefix+о"]
+focus_pane_up = ["prefix+k", "prefix+л"]
+focus_pane_right = ["prefix+l", "prefix+д"]
+swap_pane_left = ["prefix+shift+h", "prefix+shift+Р"]
+swap_pane_down = ["prefix+shift+j", "prefix+shift+О"]
+swap_pane_up = ["prefix+shift+k", "prefix+shift+Л"]
+swap_pane_right = ["prefix+shift+l", "prefix+shift+Д"]
+close_pane = ["prefix+x", "prefix+ч"]
+zoom = ["prefix+z", "prefix+я"]
+resize_mode = ["prefix+r", "prefix+к"]
+toggle_sidebar = ["prefix+b", "prefix+и"]
+split_vertical = ["prefix+v", "prefix+м"]

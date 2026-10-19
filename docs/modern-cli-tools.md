@@ -48,9 +48,9 @@ rg 'old' -l | xargs sed -i 's/old/new/g'
 
 **Alternative — `ugrep` (`ug`):** roughly comparable speed, and it **accepts GNU grep's flags**, which is the one real argument for it. Measured, not assumed: 29 GNU-grep invocations run through both binaries (ugrep 3.7.2 vs GNU grep 3.7) behaved identically on every flag tested — `-i -n -c -l -v -w -x -o -r -E -F -q -A -B -C -e -s -h -H -m -P --include --exclude --color`.
 
-Two differences survive, and they are why `alias grep='ug'` is safe interactively but not in scripts:
+Two differences survive, and they are why the repo does not alias `grep` to `ug`: agents capture interactive aliases, so the alias would reach their commands too.
 
-- **Output order is not stable.** ugrep searches in parallel; three identical `ug -r` runs gave two different orderings. `grep -r … | head` is therefore not reproducible. `--sort` fixes it, and the alias in `dotfiles/shell_common` sets it.
+- **Output order is not stable.** ugrep searches in parallel; three identical `ug -r` runs gave two different orderings. `grep -r … | head` is therefore not reproducible. `--sort` fixes it.
 - **`-r` drops the `./` prefix.** `grep -r x .` prints `./a.txt:x`; `ug -r x .` prints `a.txt:x`. No flag restores it. Anything consuming those paths should call `\grep`.
 
 Minor: `-L` returned a different exit code, and diagnostics read `ugrep: warning: …` rather than `grep: …`.
@@ -444,7 +444,7 @@ The config is not embedded here — it lives as runnable files in [`dotfiles/`](
 | `dotfiles/zshrc` | `~/.zshrc` | setopts, compinit, plugins, tool init |
 | `dotfiles/bashrc` | `~/.bashrc` | shopts, completion, tool init |
 
-Governing rule, applied throughout: **new names for new tools; core commands keep core behaviour.** Three sanctioned exceptions — `rm -I` (same binary, added flag), `df`→`duf` (read-only), `grep`→`ug` (a no-op until ugrep is installed, and narrower than "compatible" — see [ripgrep](#ripgrep-rg--replaces-grep--r) above).
+Governing rule, applied throughout: **new names for new tools; core commands keep core behaviour.** One exception — `rm -I` and the `-i` prompts (same binary, added flag). `eza`, `duf`, `btop`, `gdu`, `xh` are called by their own names. `grep` is not aliased to `ug`; see [ripgrep](#ripgrep-rg--replaces-grep--r) above for why.
 
 Every tool reference is guarded by `command -v`, so the files work on a box with none of this installed and light up as you install.
 

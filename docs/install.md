@@ -8,7 +8,7 @@ Raise a working environment on a fresh Debian-family box. Windows is further dow
 [Windows / PowerShell 7](#windows--powershell-7); the scripts themselves are in
 [`../bootstrap/`](../bootstrap/).
 
-Verified against Ubuntu 22.04 and 24.04. Written for Pop!\_OS 22.04 and Debian 12 as well — both are apt-based, and every version-sensitive decision is made at runtime rather than hardcoded per release.
+Verified against Ubuntu 22.04, 24.04 and 26.04, and Debian 13. Written for Pop!\_OS 22.04 as well — both are apt-based, and every version-sensitive decision is made at runtime rather than hardcoded per release.
 
 ---
 
@@ -18,21 +18,21 @@ Verified against Ubuntu 22.04 and 24.04. Written for Pop!\_OS 22.04 and Debian 1
 git clone https://github.com/vinterbris/cli_tools.git ~/cli_tools
 cd ~/cli_tools/bootstrap
 ./install.sh --dry-run          # read what it intends to do
-./install.sh --install-managers # do it
+./install.sh                    # do it
 exec zsh
 atuin import auto               # once, pulls existing history
 ```
 
-On a machine that already has cargo and brew, drop `--install-managers`.
+On Ubuntu 26.04 and Debian 13 apt supplies everything except `yazi` and `jless`. On an older base, add `--install-managers` so those tools can fall through to cargo or brew.
 
 ---
 
 ## What it does
 
 1. Detects the distribution and confirms apt is present
-2. Installs each missing tool from the best available source
+2. Installs each missing tool from the best available source, then `herdr` through its official installer
 3. Backs up any real config file it is about to replace, then symlinks `dotfiles/*` into `$HOME`
-4. Clones the two zsh plugins
+4. Installs the two zsh plugins from apt (git clone into `~/.zsh/` where apt lacks them)
 5. Wires `delta` into git
 6. Offers to make zsh the login shell
 7. Verifies the result and prints a summary
@@ -65,7 +65,7 @@ Safe and expected. The script distinguishes "already correct" from "needs doing"
 - A symlink already pointing at the right target is reported and skipped
 - A real file in the way is copied to `~/.dotfiles-backup/<timestamp>/` before being replaced
 - A tool whose binary is on `PATH` is never reinstalled
-- Plugin directories that are already git checkouts are left alone
+- A plugin present in `/usr/share/` or `~/.zsh/` is left alone
 
 Use it after editing `dotfiles/` on one machine to bring another into line.
 
@@ -131,14 +131,17 @@ ln -sfn "$REPO/shell_common"  ~/.shell_common
 ln -sfn "$REPO/zshrc"         ~/.zshrc
 ln -sfn "$REPO/bashrc"        ~/.bashrc
 mkdir -p ~/.config && ln -sfn "$REPO/starship.toml" ~/.config/starship.toml
+mkdir -p ~/.config/herdr && ln -sfn "$REPO/herdr.toml" ~/.config/herdr/config.toml
 ```
 
 ### 7. Plugins and git
 
 ```bash
-mkdir -p ~/.zsh
-git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions     ~/.zsh/zsh-autosuggestions
-git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting ~/.zsh/zsh-syntax-highlighting
+sudo apt install -y zsh-autosuggestions zsh-syntax-highlighting
+# no apt package? clone instead — zshrc looks in /usr/share/<name> first, then ~/.zsh/<name>
+#   git clone --depth=1 https://github.com/zsh-users/<name> ~/.zsh/<name>
+
+curl -fsSL https://herdr.dev/install.sh | sh   # -> ~/.local/bin/herdr; update with `herdr update`
 
 git config --global core.pager delta
 git config --global interactive.diffFilter 'delta --color-only'
@@ -173,7 +176,9 @@ exec zsh
 bootstrap/install.sh --skip-shell
 ```
 
-Consider trimming the tool list before running — `yazi`, `micro`, and `btop` are interactive and rarely wanted on a box you only ssh into. Edit the `TOOLS` array in `install.sh`.
+Run it as the login user, not root; it calls `sudo` for apt itself. Without cargo or brew, `yazi` and `jless` end up in the `failed` line of the summary. That is expected on an apt-only box.
+
+`herdr` replaces tmux here: run `herdr` on the server over ssh, or add the server to a local herdr with `herdr machine add <host>`.
 
 `atuin` sync across machines needs an account:
 

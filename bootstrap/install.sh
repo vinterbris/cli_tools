@@ -3,7 +3,7 @@
 # Bootstrap a modern CLI environment on a Debian-family system.
 # Idempotent: safe to re-run. Installs only what is missing.
 #
-# Targets: Ubuntu 24.04 (WSL), Pop!_OS 22.04, Debian 12.
+# Targets: Ubuntu 24.04 / 26.04 (WSL), Pop!_OS 22.04, Debian 13.
 # See docs/install.md for the manual equivalent.
 
 set -euo pipefail
@@ -93,6 +93,8 @@ apt_update_once() {
 
 # ── tool table ───────────────────────────────────────────────────
 # name | binary | apt package | min version | cargo crate | brew formula
+# binary may list alternatives, comma-separated: Debian renames some
+# (fd -> fdfind, bat -> batcat).
 # min version "-" means any apt version is acceptable.
 # "-" in a source column means that source cannot provide the tool.
 TOOLS=(
@@ -101,25 +103,25 @@ TOOLS=(
   "curl|curl|curl|-|-|curl"
   "jq|jq|jq|-|-|jq"
   "ripgrep|rg|ripgrep|-|ripgrep|ripgrep"
-  "fd|fd|fd-find|-|fd-find|fd"
-  "bat|bat|bat|-|bat|bat"
+  "fd|fd,fdfind|fd-find|-|fd-find|fd"
+  "bat|bat,batcat|bat|-|bat|bat"
   "fzf|fzf|fzf|0.48|-|fzf"
   "eza|eza|eza|-|eza|eza"
   "zoxide|zoxide|zoxide|-|zoxide|zoxide"
-  "starship|starship|-|-|starship|starship"
-  "atuin|atuin|-|-|atuin|atuin"
+  "starship|starship|starship|-|starship|starship"
+  "atuin|atuin|atuin|-|atuin|atuin"
   "delta|delta|git-delta|-|git-delta|git-delta"
   "lazygit|lazygit|lazygit|-|-|lazygit"
   "btop|btop|btop|-|-|btop"
   "duf|duf|duf|-|-|duf"
   "gdu|gdu|gdu|-|-|gdu"
-  "dust|dust|-|-|du-dust|dust"
-  "procs|procs|-|-|procs|procs"
+  "dust|dust|du-dust|-|du-dust|dust"
+  "procs|procs|procs|-|procs|procs"
   "tealdeer|tldr|tealdeer|-|tealdeer|tealdeer"
   "micro|micro|micro|-|-|micro"
   "yazi|yazi|-|-|yazi-fm|yazi"
-  "xh|xh|-|-|xh|xh"
-  "sd|sd|-|-|sd|sd"
+  "xh|xh|xh|-|xh|xh"
+  "sd|sd|sd|-|sd|sd"
   "hyperfine|hyperfine|hyperfine|-|hyperfine|hyperfine"
   "jless|jless|-|-|jless|jless"
   "trash-cli|trash-put|trash-cli|-|-|trash-cli"
@@ -130,10 +132,18 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # A real executable, not an alias — this script runs non-interactively
 # so aliases are absent, but be explicit anyway.
 have_bin() {
-  local p
-  p="$(command -v "$1" 2>/dev/null)" || return 1
-  case "$p" in /*) [ -x "$p" ] ;; *) return 1 ;; esac
+  local p b
+  local IFS=,
+  for b in $1; do
+    p="$(command -v "$b" 2>/dev/null)" || continue
+    case "$p" in /*) [ -x "$p" ] && return 0 ;; esac
+  done
+  return 1
 }
+
+# Where user-level installers (herdr, uv, pipx) put binaries; a
+# non-interactive shell may not have it on PATH yet.
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH="$HOME/.local/bin:$PATH" ;; esac
 
 apt_candidate() {
   apt-cache policy "$1" 2>/dev/null | awk '/Candidate:/{print $2; exit}'
@@ -222,14 +232,14 @@ link_dotfiles() {
     "zshrc|$HOME/.zshrc"
     "bashrc|$HOME/.bashrc"
     "starship.toml|$HOME/.config/starship.toml"
+    "herdr.toml|$HOME/.config/herdr/config.toml"
   )
-
-  run mkdir -p "$HOME/.config"
 
   local entry src dst
   for entry in "${pairs[@]}"; do
     src="$DOTFILES/${entry%%|*}"
     dst="${entry##*|}"
+    run mkdir -p "$(dirname "$dst")"
 
     if [ ! -f "$src" ]; then
       err "missing source: $src"; continue
@@ -252,21 +262,37 @@ link_dotfiles() {
   done
 }
 
+# apt package first (/usr/share/<name>); a git clone in ~/.zsh/<name>
+# is the fallback and is still honoured where one already exists.
 install_zsh_plugins() {
   info "zsh plugins"
-  run mkdir -p "$HOME/.zsh"
-  local repo dir
-  for repo in zsh-autosuggestions zsh-syntax-highlighting; do
-    dir="$HOME/.zsh/$repo"
-    if [ -d "$dir/.git" ]; then
-      ok "$repo — present"
-    elif [ -e "$dir" ]; then
-      warn "$repo — $dir exists but is not a git checkout, leaving alone"
+  local name
+  for name in zsh-autosuggestions zsh-syntax-highlighting; do
+    if [ -f "/usr/share/$name/$name.zsh" ] || [ -f "$HOME/.zsh/$name/$name.zsh" ]; then
+      ok "$name — present"
+    elif apt_can_provide "$name" "-"; then
+      install_via_apt "$name"
+      ok "$name — apt"
     else
-      run git clone --depth=1 "https://github.com/zsh-users/$repo" "$dir"
-      ok "$repo — cloned"
+      run mkdir -p "$HOME/.zsh"
+      run git clone --depth=1 "https://github.com/zsh-users/$name" "$HOME/.zsh/$name"
+      ok "$name — cloned"
     fi
   done
+}
+
+# herdr is not packaged; its own installer puts the binary in
+# ~/.local/bin, edits no rc file, needs no sudo. Update with `herdr update`.
+install_herdr() {
+  if have_bin herdr; then
+    ok "herdr — present"; SKIPPED+=("herdr"); return 0
+  fi
+  info "herdr — official installer"
+  if run bash -c 'curl -fsSL https://herdr.dev/install.sh | sh'; then
+    INSTALLED+=("herdr:installer")
+  else
+    err "herdr — installer failed"; FAILED+=("herdr")
+  fi
 }
 
 configure_git() {
@@ -309,7 +335,8 @@ post_checks() {
   [ "$missing" -eq 0 ] && ok "all tools present"
 
   local f
-  for f in "$HOME/.shell_common" "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.config/starship.toml"; do
+  for f in "$HOME/.shell_common" "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.config/starship.toml" \
+           "$HOME/.config/herdr/config.toml"; do
     [ -f "$f" ] || warn "${f/#$HOME/\~} does not resolve"
   done
 
@@ -326,6 +353,7 @@ if [ "$SKIP_TOOLS" -eq 0 ]; then
   ensure_managers
   info "Tools"
   for entry in "${TOOLS[@]}"; do install_tool "$entry"; done
+  install_herdr
 else
   dim "tools — skipped"
 fi

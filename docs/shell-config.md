@@ -63,9 +63,9 @@ Do not enable PSFzf's optional aliases (`-EnableAlias*`): one of them is `fd`, w
 
 ## Design rules
 
-- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed`, `ls`(-ish) do what a pasted script or `man` example expects. New tools get new names.
-- Three sanctioned exceptions: `rm -I` (same binary, added flag), `df`→`duf` (read-only), `grep`→`ug` (a no-op until ugrep is installed).
-- **The `grep`→`ug` exception is narrower than "compatible".** ugrep accepts GNU grep's flags — 29 invocations were diffed against GNU grep 3.7 and behaved identically — but two output differences survive. It searches in parallel, so `-r` output order varies between runs; the alias adds `--sort` to pin it. And `ug -r x .` prints `a.txt:x` where grep prints `./a.txt:x`, which no flag fixes. Anything that consumes those paths should call `\grep`.
+- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed`, `ls`, `df`, `top` do what a pasted script or `man` example expects. New tools get new names.
+- One exception: `rm -I` and `mv`/`cp`/`ln -i` (same binary, added flag; skipped under Claude Code). Agents capture interactive aliases, so `ls`→`eza` or `df`→`duf` would change their output too. `grep` is not aliased to `ug` — see below.
+- **Why `grep` is not aliased to `ug`.** ugrep accepts GNU grep's flags — 29 invocations were diffed against GNU grep 3.7 and behaved identically — but two output differences survive. It searches in parallel, so `-r` output order varies between runs; the alias adds `--sort` to pin it. And `ug -r x .` prints `a.txt:x` where grep prints `./a.txt:x`, which no flag fixes. Anything that consumes those paths should call `\grep`.
 - **Startup forks are budgeted, not banned.** `brew --prefix` is replaced by a directory probe that sets `$HOMEBREW_PREFIX`. Two forks are kept deliberately: `dircolors` (its `LS_COLORS` drives zsh completion colouring) and `lesspipe`. Everything else is pure shell.
 - **No framework.** oh-my-zsh was removed: ~60 files sourced at startup, and its plugin layer obscures what is actually loaded.
 - **Aliases are invisible to anything that shells out.** fzf runs `FZF_DEFAULT_COMMAND` through `sh`, where `fd`→`fdfind` doesn't exist. `shell_common` resolves real paths into `$FD_BIN` / `$BAT_BIN` before defining aliases, and every subshell-bound setting uses those.

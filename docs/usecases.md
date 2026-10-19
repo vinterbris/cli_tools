@@ -157,7 +157,7 @@ Reach for `h` first. `man` when `h` isn't enough.
 ### See what's going on
 
 ```bash
-gs                          # short status with branch
+gst                         # short status with branch
 gd                          # unstaged diff, through delta
 gds                         # staged diff
 gl                          # last 20 commits as a graph

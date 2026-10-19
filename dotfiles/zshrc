@@ -4,6 +4,10 @@
 #
 #  No oh-my-zsh: it sources ~60 files at startup and hides what is
 #  actually loaded. Two `source` lines replace it.
+#
+#  This file is a symlink into the repo, so a third-party installer
+#  that appends to ~/.zshrc (bun, npm, grok...) edits the repo. Move
+#  such lines to ~/.zshrc.local; compinit runs once, below.
 # ─────────────────────────────────────────────────────────────
 
 [ -f ~/.shell_common ] && . ~/.shell_common
@@ -57,11 +61,17 @@ command -v atuin    >/dev/null && eval "$(atuin init zsh)"
 command -v starship >/dev/null && eval "$(starship init zsh)"
 
 # --- plugins ----------------------------------------------------
-# git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions      ~/.zsh/zsh-autosuggestions
-# git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting  ~/.zsh/zsh-syntax-highlighting
+# apt packages zsh-autosuggestions / zsh-syntax-highlighting install
+# to /usr/share; ~/.zsh/<name> is the git-clone fallback.
+_zsh_plugin() {
+  local f
+  for f in /usr/share/$1/$1.zsh ~/.zsh/$1/$1.zsh; do
+    [ -f "$f" ] && { . "$f"; return; }
+  done
+}
+
 ZSH_AUTOSUGGEST_STRATEGY=(match_prev_cmd history completion)
-[ -f ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
-  . ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
+_zsh_plugin zsh-autosuggestions
 
 # --- local overrides (untracked) --------------------------------
 # Sourced BEFORE syntax-highlighting: anything defining widgets or
@@ -70,12 +80,5 @@ ZSH_AUTOSUGGEST_STRATEGY=(match_prev_cmd history completion)
 
 # MUST be last of everything: it wraps the line editor, and anything
 # sourced after it goes unhighlighted.
-[ -f ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
-  . ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-
-# bun completions
-[ -s "/home/vinterbris/.bun/_bun" ] && source "/home/vinterbris/.bun/_bun"
-
-# bun
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
+_zsh_plugin zsh-syntax-highlighting
+unfunction _zsh_plugin

@@ -16,7 +16,6 @@ Aliases below come from [`dotfiles/shell_common`](../dotfiles/shell_common). Sea
 
 | Alias | Runs | Notes |
 |---|---|---|
-| `ls` | `eza --group-directories-first --icons=auto` | |
 | `ll` | `eza -lh --git ...` | long + git status column |
 | `la` | `eza -lah --git ...` | + hidden |
 | `lt` | `eza --tree --level=2` | replaces `tree` |
@@ -36,7 +35,7 @@ Aliases below come from [`dotfiles/shell_common`](../dotfiles/shell_common). Sea
 | `ff` | `fd -tf` — files only |
 | `fdd` | `fd -td` — dirs only |
 | `fda` | `fd -HI` — hidden + gitignored |
-| `grep` | `grep --color=auto`, or `ug --color=auto --sort` if ugrep is installed |
+| `grep` | `grep --color=auto` |
 | `egrep` / `fgrep` | `grep -E` / `grep -F`, coloured |
 | `fd` / `bat` | → `fdfind` / `batcat` on Debian & Ubuntu, only if the real binary is absent |
 
@@ -44,11 +43,8 @@ Aliases below come from [`dotfiles/shell_common`](../dotfiles/shell_common). Sea
 
 | Alias | Runs |
 |---|---|
-| `df` | `duf` — mounted filesystems |
 | `dus` | `du -sh * \| sort -h` — coreutils fallback |
 | `dsz` | `dust -d 2` — tree by size, depth 2 |
-| `ncdu` | `gdu` — interactive, delete inside |
-| `top` | `btop` |
 | `pg` | `procs` — process grep |
 | `ptree` / `pcpu` / `pmem` | `procs --tree` / `--sortd cpu` / `--sortd mem` — tree and sort are mutually exclusive |
 
@@ -56,7 +52,7 @@ Aliases below come from [`dotfiles/shell_common`](../dotfiles/shell_common). Sea
 
 | Alias | Runs |
 |---|---|
-| `gs` | `git status -sb` |
+| `gst` | `git status -sb` — not `gs`, which is Ghostscript |
 | `gd` / `gds` | `git diff` / `--staged` |
 | `gl` | `git log --oneline --graph --decorate -20` |
 | `ga` / `gc` / `gcm` | `git add` / `commit` / `commit -m` |
@@ -75,7 +71,6 @@ Aliases below come from [`dotfiles/shell_common`](../dotfiles/shell_common). Sea
 | `tp` / `tl` / `tre` / `tempty` | `trash-put` / `-list` / `-restore` / `-empty` |
 | `md` | `mkdir -pv` |
 | `jqc` / `jqr` | `jq -c` (compact) / `jq -r` (raw strings) |
-| `http` | `xh` |
 | `aptup` | `sudo apt update && sudo apt upgrade` |
 | `aptupd` / `aptupg` | update only / upgrade only |
 | `aptin` / `aptrm` | `sudo apt install` / `remove` |
@@ -447,11 +442,11 @@ prompt redraw, not in fzf. Use these instead:
 | `h` → tldr | **`tldr`** | `h` is `Get-History` |
 | `py` | **`py`** (built in) | Windows ships the Python launcher already |
 | `sudo` | **`sudo`** → gsudo | elevates in the same console |
-| `gs`, `gd`, `gl`, `gc`… | **none** | git runs from WSL. `g` is a plain passthrough: `g status -sb` |
+| `gst`, `gd`, `gl`, `gc`… | **none** | git runs from WSL. `g` is a plain passthrough: `g status -sb` |
 | `tp` → trash-put | **`tp`** → Recycle Bin | `rm`/`Remove-Item` deletes permanently and has no `-I` |
 
 Same names as Linux: `ll` `la` `lt` `ltt` `ltg` `lsize` `lnew` `b` `bp` `rgh` `rgf`
-`ff` `fdd` `fda` `dsz` `dus` `pg` `ptree` `pcpu` `pmem` `jqc` `jqr` `http` `fm` `lg`
+`ff` `fdd` `fda` `dsz` `dus` `pg` `ptree` `pcpu` `pmem` `jqc` `jqr` `fm` `lg`
 `path` `cs` `..` `...` `....` `z` `zi`.
 
 ### PowerShell — the ones you have not used yet

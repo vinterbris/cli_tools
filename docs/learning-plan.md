@@ -157,14 +157,14 @@ Type letters in order, gaps allowed. `shcom` matches `shell_common`. `sc` matche
 
 ## Phase 5 — Git
 
-**Replace:** `git status`/`diff`/`log` → `gs` / `gd` / `gl`
+**Replace:** `git status`/`diff`/`log` → `gst` / `gd` / `gl`
 **Replace:** everything complicated → `lg`
 
 The alias set is small on purpose. Anything beyond stage-commit-push is better done in lazygit than remembered as flags.
 
 ### Sequence
 
-1. Use `gs`, `gd`, `gl` for a few days. Notice delta's side-by-side diffs.
+1. Use `gst`, `gd`, `gl` for a few days. Notice delta's side-by-side diffs.
 2. Open `lg`. Press `?`. Read the help screen once.
 3. Do one interactive stage in lazygit — `Space` on individual hunks.
 4. Do one interactive rebase in lazygit, on a branch you don't care about.
@@ -188,9 +188,9 @@ Situational. Learn when you first need it, not before — but know these exist s
 | Question | Tool |
 |---|---|
 | What's eating my disk | `gdu ~` |
-| How full are my disks | `df` (duf) |
+| How full are my disks | `duf` |
 | Quick size answer, no TUI | `dsz` |
-| What's running | `top` (btop) |
+| What's running | `btop` |
 | Find one process | `pg name` |
 | Kill something | `fkill` |
 
