@@ -15,7 +15,8 @@ One prompt, one tool set, one cheatsheet across three shells: **zsh**, **bash**,
 | Ubuntu 24.04 (WSL2) | deployed | zsh | starship, Pure preset |
 | Windows 11 | deployed | PowerShell 7 | the same `starship.toml` |
 | Pop!\_OS 22.04 (laptop) | planned | zsh | — |
-| Debian 12 (server) | planned | bash | — |
+| Ubuntu 26.04 (WSL2) | deployed | zsh | starship, Pure preset |
+| Debian 13 (servers) | deploying | zsh | starship, Pure preset |
 
 ## Start here
 
@@ -88,7 +89,7 @@ git clone https://github.com/vinterbris/cli_tools.git $HOME\cli_tools
 
 Applied throughout, and the reason the config looks the way it does:
 
-- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed` do what a pasted script or `man` example expects. New tools get new names. Three sanctioned exceptions on Linux: `rm -I`, `df`→`duf`, and `grep`→`ug` — which accepts GNU grep's flags but not its output ordering or path prefixes, so scripts should call `\grep`. **Zero on Windows** — see [docs/shell-config.md](docs/shell-config.md#powershell-specific) for why each one loses its justification there.
+- **Core commands keep core behaviour.** `grep`, `find`, `cat`, `sed` do what a pasted script or `man` example expects. New tools get new names. One exception on Linux: `rm -I` and the `-i` prompts on `mv`/`cp`/`ln`, the same binaries with a flag added. Agents capture interactive aliases too, so a shadowed core name would change their output as well. **Zero on Windows** — see [docs/shell-config.md](docs/shell-config.md#powershell-specific) for why each one loses its justification there.
 - **No framework.** oh-my-zsh replaced by two `source` lines. Nothing is loaded that you cannot point at.
 - **Guarded everywhere.** Every tool reference is wrapped in `command -v`, so the config works on a bare machine and lights up as you install.
 - **Machine-local settings never touch tracked files** — `~/.zshrc.local` and `~/.bashrc.local` are sourced at the end.

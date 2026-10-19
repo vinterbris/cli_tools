@@ -36,8 +36,8 @@ rights, current versions, one `scoop update *`. Windows Terminal is assumed.
 3. **Overriding `ls` breaks the object pipeline.** `ls | Where-Object Length -gt 1MB`
    works today. An `eza` function returns strings and silently breaks it. The repo's
    "core commands keep core behaviour" rule has sharper teeth here: **no core command
-   is overridden at all on Windows.** Every Linux name that shadows one — `grep`→`ug`,
-   `df`→`duf`, `top`→`btop`, `h`→`tldr`, `rm -I` — was dropped rather than ported.
+   is overridden at all on Windows.** Every Linux name that shadows one —
+   `h`→`tldr`, `rm -I` — was dropped rather than ported.
 
 4. **fzf has no `--powershell` init.** Bindings come from the `PSFzf` module, not from
    `FZF_CTRL_T_COMMAND` / `FZF_ALT_C_COMMAND`. `Ctrl-R` is not bound by PSFzf unless

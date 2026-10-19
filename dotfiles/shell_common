@@ -5,11 +5,9 @@
 #  Sourced from ~/.bashrc and ~/.zshrc. See dotfiles/README.md
 #
 #  Design rule: new names for new tools; core commands keep core
-#  behaviour. Exceptions are safe ones only —
-#    rm -I   same binary, added flag
-#    df→duf  read-only
-#    grep→ug accepts GNU grep's flags — see the search section
-#            for the two output differences that remain
+#  behaviour. Agents capture interactive aliases too, so a shadowed
+#  core name changes their output. One exception, same binary only —
+#    rm -I / mv -i / cp -i / ln -i   added flag, skipped under Claude Code
 # ─────────────────────────────────────────────────────────────
 
 # --- PATH -------------------------------------------------------
@@ -66,7 +64,6 @@ export FD_BIN BAT_BIN
 # --- ls / eza ---------------------------------------------------
 if command -v eza >/dev/null; then
   EZA_BASE='--group-directories-first --icons=auto'
-  alias ls="eza $EZA_BASE"
   alias ll="eza -lh --git $EZA_BASE"
   alias la="eza -lah --git $EZA_BASE"
   alias lt="eza --tree --level=2 $EZA_BASE"
@@ -90,25 +87,12 @@ if command -v bat >/dev/null || command -v batcat >/dev/null; then
 fi
 
 # --- search -----------------------------------------------------
-# rg keeps its own name. ug accepts GNU grep's flags, so aliasing is
-# safe for interactive use. No-op until ugrep is installed. Bypass
-# with \grep.
-#
-# Measured against GNU grep 3.7 with ugrep 3.7.2 — 29 invocations,
-# identical behaviour on every flag tested, with two exceptions:
-#   * ugrep searches in parallel, so `ug -r` output order varies run
-#     to run. `--sort` below pins it; without it, `grep -r … | head`
-#     is not reproducible. This is why the flag is here.
-#   * `ug -r x .` prints `a.txt:x` where grep prints `./a.txt:x`.
-#     Not fixable by a flag. Scripts that consume those paths should
-#     call \grep.
-if command -v ug >/dev/null; then
-  alias grep='ug --color=auto --sort'
-else
-  alias grep='grep --color=auto'      # stock Ubuntu behaviour
-  alias egrep='grep -E --color=auto'
-  alias fgrep='grep -F --color=auto'
-fi
+# rg keeps its own name; grep stays GNU grep. Not aliased to ugrep:
+# its output order and path prefixes differ, and agents capture
+# interactive aliases (see docs/modern-cli-tools.md).
+alias grep='grep --color=auto'      # stock Ubuntu behaviour
+alias egrep='grep -E --color=auto'
+alias fgrep='grep -F --color=auto'
 alias rgh='rg -uuu'                              # everything: no ignore, hidden, binary
 alias rgf='rg --files'                           # list files rg would search
 
@@ -118,13 +102,10 @@ alias fdd='fd -td'                               # dirs only
 alias fda='fd -HI'                               # hidden + gitignored
 
 # --- disk -------------------------------------------------------
-command -v duf  >/dev/null && alias df='duf'     # read-only, safe to override
-command -v gdu  >/dev/null && alias ncdu='gdu'
 command -v dust >/dev/null && alias dsz='dust -d 2'
 alias dus='du -sh * 2>/dev/null | sort -h'       # coreutils fallback
 
 # --- process / system -------------------------------------------
-command -v btop  >/dev/null && alias top='btop'
 command -v procs >/dev/null && alias pg='procs'  # "process grep"
 alias ptree='procs --tree'
 alias pcpu='procs --sortd cpu'
@@ -133,7 +114,7 @@ alias pmem='procs --sortd mem'
 # --- git --------------------------------------------------------
 # NOTE: `gl` here is log, NOT `git pull` (oh-my-zsh meaning). `git pull`
 # is deliberately unaliased — you want to see what it does.
-alias gs='git status -sb'
+alias gst='git status -sb'                       # not `gs`: that is Ghostscript
 alias gd='git diff'
 alias gds='git diff --staged'
 alias gl='git log --oneline --graph --decorate -20'
@@ -148,7 +129,6 @@ command -v lazygit >/dev/null && alias lg='lazygit'
 # --- json / http ------------------------------------------------
 alias jqc='jq -c'
 alias jqr='jq -r'
-command -v xh >/dev/null && alias http='xh'
 
 # --- package manager (apt) --------------------------------------
 if command -v apt >/dev/null; then
@@ -162,10 +142,14 @@ fi
 # --- file safety ------------------------------------------------
 # rm -I prompts ONCE for >3 files or -r. No habituation, unlike -i.
 # NOTE: aliases do not expand under `sudo` or inside scripts.
-alias rm='rm -I'
-alias mv='mv -i'
-alias cp='cp -i'
-alias ln='ln -i'
+# Skipped under Claude Code (CLAUDECODE=1): its non-interactive commands read
+# EOF at the prompt and silently skip the copy or move (VIN-2311).
+if [ -z "${CLAUDECODE:-}" ]; then
+  alias rm='rm -I'
+  alias mv='mv -i'
+  alias cp='cp -i'
+  alias ln='ln -i'
+fi
 # Recoverable delete, opt-in under its own name (freedesktop trash).
 # Caveat: cross-filesystem = full copy; outside $HOME needs .Trash-$UID.
 if command -v trash-put >/dev/null; then
